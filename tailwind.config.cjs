@@ -2,7 +2,11 @@
 module.exports = {
   content: ['./src/**/*.{index,vue,js,ts,jsx,tsx}'],
   theme: {
-    extend: {},
+    extend: {
+      transitionProperty: {
+        'vertical': 'height, padding, border'
+      }
+    }
   },
   plugins: [],
 }

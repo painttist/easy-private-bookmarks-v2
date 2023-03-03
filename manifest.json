@@ -1,6 +1,8 @@
 {
   "action": {
-    "default_popup": "src/popup/index.html"
+    "default_popup": "src/popup/index.html",
+    "default_title": "Easy Private Bookmarks v2",
+    "default_icon": "logo.png"
   },
   "background": {
     "service_worker": "src/background/index.ts",
@@ -16,10 +18,10 @@
   ],
   "host_permissions": ["*://*/*"],
   "manifest_version": 3,
-  "name": "vite-vue3-chrome-extension-v3",
+  "name": "Easy Private Bookmarks",
   "options_page": "src/options/index.html",
-  "permissions": ["storage", "activeTab"],
-  "version": "1.0.0",
+  "permissions": ["storage", "bookmarks"],
+  "version": "2.0.0",
   "web_accessible_resources": [
     {
       "matches": ["*://*/*"],

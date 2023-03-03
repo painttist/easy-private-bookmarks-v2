@@ -9,6 +9,29 @@ export {}
 
 declare module '@vue/runtime-core' {
   export interface GlobalComponents {
-    IconMdiTick: typeof import('~icons/mdi/tick')['default']
+    BookmarksLink: typeof import('./components/BookmarksLink.vue')['default']
+    BookmarksScroll: typeof import('./components/BookmarksScroll.vue')['default']
+    copy: typeof import('./components/ModalPassword copy.vue')['default']
+    IconMdiApple: typeof import('~icons/mdi/apple')['default']
+    IconMdiBookmark: typeof import('~icons/mdi/bookmark')['default']
+    IconMdiBookmarkBox: typeof import('~icons/mdi/bookmark-box')['default']
+    IconMdiCheck: typeof import('~icons/mdi/check')['default']
+    IconMdiCheckBold: typeof import('~icons/mdi/check-bold')['default']
+    IconMdiClock: typeof import('~icons/mdi/clock')['default']
+    IconMdiCloseThick: typeof import('~icons/mdi/close-thick')['default']
+    IconMdiCog: typeof import('~icons/mdi/cog')['default']
+    IconMdiEye: typeof import('~icons/mdi/eye')['default']
+    IconMdiEyeOff: typeof import('~icons/mdi/eye-off')['default']
+    IconMdiFilter: typeof import('~icons/mdi/filter')['default']
+    IconMdiFilterOutline: typeof import('~icons/mdi/filter-outline')['default']
+    IconMdiFolder: typeof import('~icons/mdi/folder')['default']
+    IconMdiFolderOpen: typeof import('~icons/mdi/folder-open')['default']
+    IconMdiFolderOutline: typeof import('~icons/mdi/folder-outline')['default']
+    IconMdiLock: typeof import('~icons/mdi/lock')['default']
+    IconMdiLockOpen: typeof import('~icons/mdi/lock-open')['default']
+    IconMdiMagnify: typeof import('~icons/mdi/magnify')['default']
+    Modal: typeof import('./components/Modal.vue')['default']
+    ModalPassword: typeof import('./components/ModalPassword.vue')['default']
+    ModalWarning: typeof import('./components/ModalWarning.vue')['default']
   }
 }
