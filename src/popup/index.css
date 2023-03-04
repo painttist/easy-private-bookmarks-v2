@@ -50,3 +50,14 @@
   scrollbar-face-color: #a0aec0;
   scrollbar-track-color: #edf2f7;
 }
+
+/* Transition */
+.v-enter-active,
+.v-leave-active {
+  transition: opacity 0.5s ease;
+}
+
+.v-enter-from,
+.v-leave-to {
+  opacity: 0;
+}

@@ -2,37 +2,48 @@
 // const bookmarks = ref<chrome.bookmarks.BookmarkTreeNode[]>([])
 
 import { manageBookmarkKey, passwordKey } from '../api/injectkeys'
+import { migrate, getKeyPair, removeKeyPair, storeKeyPair } from '../api/keys'
 import {
-  BookMarkInfo,
+  BookmarkInfo,
+  BookmarkStoreInfo,
   DEFAULT_KEYTIMEOUT,
+  decryptData,
   generateHashForPassword,
   generateNewURLFromFrag,
+  getEncryptedLink,
+  generateEncryptedPrivateKeyPair,
   isLockedURL,
   processNodes,
   urlSupportIdentifier,
+  BookmarkProcessedInfo,
 } from '../api/lib'
 import { decryptFragment, generateFragment } from '../api/link'
 
-const bookmarks = ref<BookMarkInfo[]>([])
+const bookmarks = ref<BookmarkProcessedInfo[]>([])
 const rawInfo = ref<chrome.bookmarks.BookmarkTreeNode[] | undefined>(undefined)
 
 const elmInput = ref<HTMLInputElement | null>(null)
+const elmScrollContainer = ref<HTMLElement | null>(null)
 
 const searchQuery = ref('')
+const filtering = ref(false)
 
 chrome.bookmarks.getTree((tree) => {
   rawInfo.value = tree?.[0]?.children?.[0]?.children
   if (rawInfo.value) {
-    bookmarks.value = processNodes(rawInfo.value, '')
+    bookmarks.value = processNodes(rawInfo.value, '', filtering.value)
   }
-  // bookmarks.value =  || []
-  // console.log(bookmarks.value)
 })
 
-const filtering = ref(false)
-
 const testPassword = ref('12345687')
-const lockHash = ref('')
+
+const publickKey = ref('')
+const privateKeyEncrypted = ref('')
+
+const isLockEmpty = computed(() => {
+  return !privateKeyEncrypted.value || !publickKey.value
+})
+
 const unloackPassword = ref('')
 
 enum Modals {
@@ -50,76 +61,31 @@ const elmModelLock = ref<HTMLElement | null>(null)
 const urlBase = chrome.runtime.getURL('options.html')
 
 async function initialize() {
-  // get v1 stored plain password
-  // await chrome.storage.sync.set({ 'lock-password': "t1f2000" })
+  // migrate from v1
+  await migrate()
 
-  let data = await chrome.storage.sync.get('lock-password')
-  let lockPassword = data['lock-password']
-  if (!lockPassword) {
-    let data = await chrome.storage.sync.get('lock-hash')
-    if (data['lock-hash']) {
-      lockHash.value = data['lock-hash']
-      console.log('Lock Hash Loaded', lockHash.value)
-    } else {
-      activeModal.value = Modals.Lock
-    }
-    return // not v1
+  let keyPair = await getKeyPair()
+  if (keyPair) {
+    console.log('Key pair found')
+    console.log(keyPair)
+    publickKey.value = keyPair.jwkPublicKey
+    privateKeyEncrypted.value = keyPair.encryptedPrivateKey
   } else {
-    console.log('Migrating from v1')
-    let bookmarksTree = await chrome.bookmarks.getTree()
-    lockHash.value = await generateHashForPassword(lockPassword)
-    console.log('Generates lock-hash from v1 password: ', lockHash.value)
-    const updateTreeFromV1 = async (
-      tree: chrome.bookmarks.BookmarkTreeNode[]
-    ) => {
-      for (let node of tree) {
-        if (node.children) {
-          await updateTreeFromV1(node.children)
-        }
-        if (!node.url) {
-          continue
-        }
-        // console.log(isLockedURL(node.url))
-        if (isLockedURL(node.url)) {
-          let url = new URL(node.url)
-          // let fragment = url.hash.slice(1)
-          console.log('Processessing Locked URL with url: ', url)
-          try {
-            let output = await decryptFragment(url, lockPassword)
-            if (output) {
-              console.log('Decrypted fragment: ', output.decrypted)
-              let url = output.decrypted
-              let frag = await generateFragment(
-                url,
-                lockHash.value,
-                node.title,
-                true,
-                true
-              )
-              console.log('New URL:', generateNewURLFromFrag(frag))
-              // chrome.bookmarks.update(node.id, {
-              //   url: generateNewURLFromFrag(frag),
-              // })
-            } else {
-              console.log('Failed to decrypt fragment: ', url)
-            }
-          } catch (error) {
-            console.log(error)
-          }
-        }
-      }
-    }
-
-    let bookmarks = bookmarksTree?.[0]?.children?.[0]?.children
-
-    if (bookmarks) {
-      console.log('Bookmarks tree: ', bookmarks)
-      await updateTreeFromV1(bookmarks)
-    }
+    console.log('Key pair not found')
+    // prompt user to create a new key pair
+    activeModal.value = Modals.Lock
   }
+}
 
-  // remove the v1 stored plain password
-  await chrome.storage.sync.remove('lock-password')
+function decryptLockedLinkv2(
+  url: string,
+  password: string,
+  encryptedPrivateKey: string | undefined
+) {
+  let urlObj = new URL(url)
+  let fragment = urlObj.hash.slice(1)
+  let data = decryptData(fragment, password, encryptedPrivateKey)
+  return data
 }
 
 onBeforeMount(async () => {
@@ -134,145 +100,158 @@ onBeforeMount(async () => {
   // console.log(lockHash.value)
 })
 
-provide(passwordKey, { lockHash: lockHash, unlockPassword: testPassword })
+const openFolder = (id: string) => {
+  // pass
+  if (!bookmarks.value) return
+  let folderIndex = bookmarks.value.findIndex((item) => {
+    return item.id == id
+  })
+  let folderLevel = bookmarks.value[folderIndex].level
+  let itemLevel = folderLevel + 1
 
-provide(manageBookmarkKey, {
-  openFolder: (id: string) => {
-    // pass
-    if (!bookmarks.value) return
-    let folderIndex = bookmarks.value.findIndex((item) => {
-      return item.id == id
-    })
-    let folderLevel = bookmarks.value[folderIndex].level
-    let itemLevel = folderLevel + 1
+  let newBookmarks = bookmarks.value.slice()
 
-    let newBookmarks = bookmarks.value.slice()
-
-    chrome.bookmarks.getSubTree(id, (node) => {
-      // console.log('Got node', node[0])
-      if (!node[0].children) return
-      newBookmarks.splice(
-        folderIndex + 1,
-        0,
-        ...processNodes(node[0].children, searchQuery.value).map((item) => {
+  chrome.bookmarks.getSubTree(id, (node) => {
+    // console.log('Got node', node[0])
+    if (!node[0].children) return
+    newBookmarks.splice(
+      folderIndex + 1,
+      0,
+      ...processNodes(node[0].children, searchQuery.value, filtering.value).map(
+        (item) => {
           item.level = item.level + itemLevel
           return item
-        })
+        }
       )
-      newBookmarks[folderIndex].open = true
-      bookmarks.value = newBookmarks
-    })
-  },
-  closeFolder: (id: string) => {
-    // find node with id then delete all its children
-    if (!bookmarks.value) return
-
-    let folderIndex = bookmarks.value.findIndex((item) => {
-      return item.id == id
-    })
-    let folderLevel = bookmarks.value[folderIndex].level
-
-    let newBookmarks = bookmarks.value.slice()
-
-    // console.log('Level:', folderLevel)
-    var i = folderIndex + 1
-    while (newBookmarks[i].level > folderLevel) {
-      newBookmarks.splice(i, 1)
-    }
-    newBookmarks[folderIndex].open = false
-    bookmarks.value = newBookmarks
-  },
-  updateBookmark: async (newNode: BookMarkInfo) => {
-    if (!bookmarks.value) return
-
-    console.log(
-      'Updating bookmark: ',
-      newNode.title,
-      ' with url: ',
-      newNode.url,
-      ' and id: ',
-      newNode.id,
-      ''
     )
-    try {
-      await chrome.bookmarks.update(newNode.id, {
-        title: newNode.title,
-        url: newNode.url,
-      })
-    } catch (error) {
-      console.log(error)
-      return
-    }
+    newBookmarks[folderIndex].open = true
+    bookmarks.value = newBookmarks
+  })
+}
 
-    let tree = await chrome.bookmarks.getTree()
-    rawInfo.value = tree?.[0]?.children?.[0]?.children
+const closeFolder = (id: string) => {
+  // find node with id then delete all its children
+  if (!bookmarks.value) return
 
-    let item = await chrome.bookmarks.getSubTree(newNode.id)
-    console.log(
-      'getSubTree: ',
-      item[0].title,
-      ' with url: ',
-      item[0].url,
-      ' and id: ',
-      item[0].id,
-      ''
+  let folderIndex = bookmarks.value.findIndex((item) => {
+    return item.id == id
+  })
+  let folderLevel = bookmarks.value[folderIndex].level
+  let newBookmarks = bookmarks.value.slice()
+
+  var i = folderIndex + 1
+  while (
+    i < newBookmarks.length &&
+    newBookmarks[i].level &&
+    newBookmarks[i].level > folderLevel
+  ) {
+    newBookmarks.splice(i, 1)
+  }
+  newBookmarks[folderIndex].open = false
+  bookmarks.value = newBookmarks
+}
+
+const updateBookmark = async (newNode: BookmarkInfo) => {
+  if (!bookmarks.value) return
+
+  try {
+    await chrome.bookmarks.update(newNode.id, {
+      title: newNode.title,
+      url: newNode.url,
+    })
+  } catch (error) {
+    console.log(error)
+    return
+  }
+
+  let tree = await chrome.bookmarks.getTree()
+  rawInfo.value = tree?.[0]?.children?.[0]?.children
+
+  if (rawInfo.value) {
+    bookmarks.value = processNodes(
+      rawInfo.value,
+      searchQuery.value,
+      filtering.value
+    )
+  }
+}
+
+const deleteBookmark = async (id: string) => {
+  if (!bookmarks.value) return
+
+  try {
+    await chrome.bookmarks.remove(id)
+  } catch (error) {
+    console.log(error)
+    return
+  }
+
+  let tree = await chrome.bookmarks.getTree()
+  rawInfo.value = tree?.[0]?.children?.[0]?.children
+
+  if (rawInfo.value) {
+    bookmarks.value = processNodes(
+      rawInfo.value,
+      searchQuery.value,
+      filtering.value
+    )
+  }
+}
+
+const lockBookmark = async (info: BookmarkInfo) => {
+  if (!info.url) return
+
+  let newLink = await getEncryptedLink(
+    {
+      url: info.url,
+      title: info.title,
+    },
+    publickKey.value
+  )
+
+  if (!newLink) return
+
+  updateBookmark({
+    id: info.id,
+    title: 'Locked',
+    url: newLink,
+  })
+}
+const unlockBookmark = async (info: BookmarkInfo) => {
+  if (!info.url) return
+  try {
+    let storedInfo = await decryptLockedLinkv2(
+      info.url,
+      testPassword.value,
+      privateKeyEncrypted.value
     )
 
-    if (rawInfo.value) {
-      bookmarks.value = processNodes(rawInfo.value, searchQuery.value)
-    }
+    if (!storedInfo) return
 
-    // let bookmarkIndex = bookmarks.value.findIndex((item) => {
-    //   return item.id == newNode.id
-    // })
-    // let newBookmarks = bookmarks.value.slice()
-    // newBookmarks[bookmarkIndex] = newNode
-
-    // bookmarks.value[bookmarkIndex] = newNode
-  },
-  deleteBookmark: async (id: string) => {
-    if (!bookmarks.value) return
-
-    try {
-      await chrome.bookmarks.remove(id)
-    } catch (error) {
-      console.log(error)
-      return
-    }
-
-    let tree = await chrome.bookmarks.getTree()
-    rawInfo.value = tree?.[0]?.children?.[0]?.children
-
-    let bookmarkIndex = bookmarks.value.findIndex((item) => {
-      return item.id == id
+    updateBookmark({
+      id: info.id,
+      title: storedInfo.title,
+      url: storedInfo.url,
     })
-    let newBookmarks = bookmarks.value.slice()
-    newBookmarks.splice(bookmarkIndex, 1)
-    bookmarks.value = newBookmarks
-  },
+  } catch (error) {
+    console.log(error)
+  }
+}
+
+provide(manageBookmarkKey, {
+  openFolder,
+  closeFolder,
+  updateBookmark,
+  deleteBookmark,
+  lockBookmark,
+  unlockBookmark,
 })
 
 function onInputFocus() {
   // resets filtering and clear the searchQuery if currently filtering
-  if (filtering.value) {
-    toggleFilter()
-  }
-}
-
-function toggleFilter() {
-  if (rawInfo.value === undefined) {
-    return
-  }
-  filtering.value = !filtering.value
-  if (filtering.value) {
-    searchQuery.value = '[ Locked URL ]'
-    let baseURL = chrome.runtime.getURL('options.html')
-    // bookmarks.value = processNodes(rawInfo.value, baseURL + '#')
-    bookmarks.value = processNodes(rawInfo.value, 'locked')
-  } else {
-    searchQuery.value = ''
-    bookmarks.value = processNodes(rawInfo.value, '')
-  }
+  // if (filtering.value) {
+  //   toggleFilter()
+  // }
 }
 
 function updateSearch(e: KeyboardEvent) {
@@ -281,7 +260,11 @@ function updateSearch(e: KeyboardEvent) {
   if (rawInfo.value === undefined) {
     return
   }
-  bookmarks.value = processNodes(rawInfo.value, searchQuery.value)
+  bookmarks.value = processNodes(
+    rawInfo.value,
+    searchQuery.value,
+    filtering.value
+  )
 }
 
 function clearSearch(e: KeyboardEvent) {
@@ -291,31 +274,41 @@ function clearSearch(e: KeyboardEvent) {
   }
 }
 
-async function updateLockHash({
-  newPassword,
-  updateChrome,
-}: {
-  newPassword: string
-  updateChrome: boolean
-}) {
-  let newHash = ''
+function toggleFilter() {
+  if (rawInfo.value === undefined) {
+    return
+  }
+  filtering.value = !filtering.value
+  if (filtering.value) {
+    // searchQuery.value = '[ Locked URL ]'
+  } else {
+    // searchQuery.value = ''
+  }
+  bookmarks.value = processNodes(
+    rawInfo.value,
+    searchQuery.value,
+    filtering.value
+  )
+}
+
+async function setNewPassword(newPassword: string, updateChrome: boolean) {
   if (newPassword === '') {
     if (updateChrome) {
-      chrome.storage.sync.remove('lock-hash', () => {
-        console.log('Chrome Storage Remove Lock Hash')
-      })
-      lockHash.value = ''
+      removeKeyPair()
+      publickKey.value = ''
+      privateKeyEncrypted.value = ''
     }
   } else {
-    newHash = await generateHashForPassword(newPassword)
-    lockHash.value = newHash
-
+    let keyPair = await generateEncryptedPrivateKeyPair(newPassword)
     if (updateChrome) {
-      chrome.storage.sync.set({ 'lock-hash': newHash }, () => {
-        console.log('Chrome Storage Set Lock Hash')
-      })
+      storeKeyPair(keyPair.jwkPublicKey, keyPair.encryptedPrivateKey)
+      publickKey.value = JSON.stringify(keyPair.jwkPublicKey)
+      privateKeyEncrypted.value = keyPair.encryptedPrivateKey
     }
   }
+}
+
+function clearModal() {
   activeModal.value = Modals.None
 }
 
@@ -352,8 +345,18 @@ async function updateUnlockPassword({
   activeModal.value = Modals.None
 }
 
-function handleCogClick() {
-  console.log(activeModal.value)
+async function handleAddClick() {
+  // genereate a new key pair
+  let keyPair = await generateEncryptedPrivateKeyPair(testPassword.value)
+  await storeKeyPair(keyPair.jwkPublicKey, keyPair.encryptedPrivateKey)
+  publickKey.value = JSON.stringify(keyPair.jwkPublicKey)
+  privateKeyEncrypted.value = keyPair.encryptedPrivateKey
+}
+
+function handleDeleteClick() {
+  removeKeyPair()
+  publickKey.value = ''
+  privateKeyEncrypted.value = ''
 }
 
 onMounted(() => {
@@ -393,8 +396,8 @@ onMounted(() => {
     :message="'One-time Lock Setup'"
     :requiresConfirm="true"
     :inputPlaceholders="['Set a password', 'Confirm']"
-    @panel-confirm="updateLockHash"
-    @panel-close="activeModal = Modals.None"
+    @panel-confirm="setNewPassword($event, true).then(clearModal)"
+    @panel-close="clearModal"
   >
   </modal-password>
   <modal-password
@@ -404,46 +407,68 @@ onMounted(() => {
     :requiresConfirm="false"
     :inputPlaceholders="['Password please']"
     @panel-confirm="updateUnlockPassword"
-    @panel-close="activeModal = Modals.None"
+    @panel-close="clearModal"
   >
   </modal-password>
   <modal-warning
     ref="elmModeleWarning"
     :opened="activeModal == Modals.WarnDeleteKey"
+    :title="'Delete Key?'"
     :message="`- This won\'t unlock bookmarks.
 - Removes hash for locking without password.
 - Need a password to lock again.
 - Existing passwords won't change. `"
-    @panel-confirm="updateLockHash"
-    @panel-close="activeModal = Modals.None"
+    @panel-confirm="setNewPassword('', true).then(clearModal)"
+    @panel-close="clearModal"
   >
   </modal-warning>
   <div class="p-2 bg-gray-100 w-full">
     <div class="w-full flex gap-2">
       <button
-        :title="`${lockHash == '' ? 'Add Lock' : 'Remove Lock'}`"
-        class="p-2 text-base rounded transition-colors duration-200"
+        :title="`${isLockEmpty ? 'Add Lock' : 'Remove Lock'}`"
+        class="p-2 text-base rounded transition-colors"
         :class="{
-          'bg-blue-200 text-blue-800 hover:text-black': lockHash == '',
-          'bg-purple-200 text-purple-900 hover:text-purple-700': lockHash != '',
+          'bg-blue-200 text-blue-800 hover:text-black': isLockEmpty,
+          'bg-purple-200 text-purple-900 hover:text-purple-700': !isLockEmpty,
         }"
         @click="
-          lockHash == ''
+          isLockEmpty
             ? (activeModal = Modals.Lock)
             : (activeModal = Modals.WarnDeleteKey)
         "
       >
-        <icon-mdi-lock-open v-if="lockHash == ''" />
-        <icon-mdi-lock v-if="lockHash != ''" />
+        <icon-mdi-lock-open v-if="isLockEmpty" />
+        <icon-mdi-lock v-if="!isLockEmpty" />
       </button>
       <button
         title="Filter Locked URL"
         class="p-2 text-base rounded transition-colors duration-200"
         :class="{}"
-        @click="handleCogClick"
+        @click="handleAddClick"
       >
-        <icon-mdi-cog />
+        <icon-mdi-key />
       </button>
+      <button
+        title="Filter Locked URL"
+        class="p-2 text-base rounded transition-colors duration-200"
+        :class="{}"
+        @click="handleDeleteClick"
+      >
+        <icon-mdi-delete />
+      </button>
+      <div class="relative w-full">
+        <input
+          ref="elmInput"
+          :value="searchQuery"
+          @focus="onInputFocus"
+          @keyup="updateSearch"
+          @keydown.esc="clearSearch"
+          class="h-full w-full pl-8 text-base bg-white focus:outline-blue-400 rounded"
+        />
+        <icon-mdi-magnify
+          class="absolute top-1/2 left-2 transform -translate-y-1/2 text-base"
+        />
+      </div>
       <button
         title="Filter Locked URL"
         class="p-2 text-base rounded transition-colors duration-200"
@@ -457,28 +482,22 @@ onMounted(() => {
       >
         <icon-mdi-filter />
       </button>
-      <div class="relative w-full">
-        <input
-          ref="elmInput"
-          :value="searchQuery"
-          @focus="onInputFocus"
-          @keyup="updateSearch"
-          @keydown.esc="clearSearch"
-          class="h-full w-full pl-8 text-base bg-white focus:outline-blue-400 rounded"
-          :class="{
-            '': !filtering,
-            'border-2 border-yellow-400 italic': filtering,
-          }"
-        />
-        <icon-mdi-magnify
-          class="absolute top-1/2 left-2 transform -translate-y-1/2 text-base"
+    </div>
+    <div class="h-[400px]">
+      <div
+        class="transition-vertical ease-[cubic-bezier(0.25, 1, 0.5, 1)] duration-200 overflow-hidden bg-gray-100"
+        ref="elmScrollContainer"
+        :class="{
+          'h-0': bookmarks.length == 0,
+          'h-[400px]': bookmarks.length > 0,
+        }"
+      >
+        <bookmarks-scroll
+          v-if="bookmarks.length > 0"
+          :list="bookmarks"
         />
       </div>
     </div>
-    <bookmarks-scroll
-      v-if="bookmarks.length > 0"
-      :list="bookmarks"
-    />
   </div>
 </template>
 

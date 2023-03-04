@@ -20,6 +20,7 @@ declare module '@vue/runtime-core' {
     IconMdiClock: typeof import('~icons/mdi/clock')['default']
     IconMdiCloseThick: typeof import('~icons/mdi/close-thick')['default']
     IconMdiCog: typeof import('~icons/mdi/cog')['default']
+    IconMdiDelete: typeof import('~icons/mdi/delete')['default']
     IconMdiEye: typeof import('~icons/mdi/eye')['default']
     IconMdiEyeOff: typeof import('~icons/mdi/eye-off')['default']
     IconMdiFilter: typeof import('~icons/mdi/filter')['default']
@@ -27,11 +28,15 @@ declare module '@vue/runtime-core' {
     IconMdiFolder: typeof import('~icons/mdi/folder')['default']
     IconMdiFolderOpen: typeof import('~icons/mdi/folder-open')['default']
     IconMdiFolderOutline: typeof import('~icons/mdi/folder-outline')['default']
+    IconMdiKey: typeof import('~icons/mdi/key')['default']
+    IconMdiKeyPlus: typeof import('~icons/mdi/key-plus')['default']
     IconMdiLock: typeof import('~icons/mdi/lock')['default']
     IconMdiLockOpen: typeof import('~icons/mdi/lock-open')['default']
     IconMdiMagnify: typeof import('~icons/mdi/magnify')['default']
     Modal: typeof import('./components/Modal.vue')['default']
     ModalPassword: typeof import('./components/ModalPassword.vue')['default']
     ModalWarning: typeof import('./components/ModalWarning.vue')['default']
+    Search: typeof import('./components/Search.vue')['default']
+    SearchBar: typeof import('./components/SearchBar.vue')['default']
   }
 }

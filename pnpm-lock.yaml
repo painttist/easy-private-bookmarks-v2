@@ -10,6 +10,7 @@ specifiers:
   '@vitejs/plugin-vue': ^4.0.0
   '@vueuse/core': ^9.13.0
   autoprefixer: ^10.4.13
+  opencrypto: ^1.5.5
   postcss: ^8.4.21
   prettier: ^2.8.4
   prettier-plugin-tailwindcss: ^0.2.3
@@ -26,6 +27,7 @@ specifiers:
 
 dependencies:
   '@types/vue-virtual-scroller': /@earltp/vue-virtual-scroller/1.0.1
+  opencrypto: 1.5.5
   vue: 3.2.47
   vue-virtual-scroller: 2.0.0-beta.8_vue@3.2.47
 
@@ -1810,6 +1812,10 @@ packages:
     dependencies:
       mimic-fn: 2.1.0
     dev: true
+
+  /opencrypto/1.5.5:
+    resolution: {integrity: sha512-hMwIB3B1O5B4YU8bVoUWKzEEc4ThfbysRdAsOsbvuXqZMXLH/Biq106BtrQ2oU5vwnDb9dvvITblG/T9aGb9vw==}
+    dev: false
 
   /p-limit/3.1.0:
     resolution: {integrity: sha512-TYOanM3wGwNGsZN2cVTYPArw454xnXj5qmWF1bEoAc4+cU/ol7GVh7odevjp1FNHduHc3KZMcFduxU5Xc6uJRQ==}

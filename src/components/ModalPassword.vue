@@ -78,13 +78,17 @@ const canConfirm = computed(() => {
 })
 
 // define emits
-const emit = defineEmits(['panel-confirm', 'panel-close'])
+// const emit = defineEmits(['panel-confirm', 'panel-close'])
+const emit = defineEmits<{
+  (event: 'panel-confirm', newPassword: string): void
+  (event: 'panel-close'): void
+}>()
 
 // define methods
 const onConfirmBtn = (event: Event) => {
   if (canConfirm.value) {
     // confirm
-    emit('panel-confirm', { newPassword: password.value, updateChrome: true })
+    emit('panel-confirm', password.value)
     password.value = ''
     confirmPassword.value = ''
 

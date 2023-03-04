@@ -2,7 +2,7 @@
   <teleport to="body">
     <transition name="fade">
       <modal
-        :message="'Are you sure?'"
+        :message="title || 'Are you sure?'"
         :wide="true"
         v-if="opened"
       >
@@ -36,6 +36,7 @@
 
 const props = defineProps<{
   message: string
+  title: string | undefined
   opened: boolean
 }>()
 
