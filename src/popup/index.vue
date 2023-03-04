@@ -103,6 +103,7 @@ const peekNodesCallback = (id: string, data: BookmarkStoreInfo | undefined) => {
     if (peeking.value) {
       bookmarks.value[idx].url = data.url
       bookmarks.value[idx].title = data.title
+      bookmarks.value[idx].peeked = true
     }
   } else {
     // do nothing
@@ -278,7 +279,14 @@ const unlockBookmark = async (info: BookmarkInfo) => {
 
   console.log('Unlock Bookmark')
 
-  console.log('isPasswordEmpty.value', isPasswordEmpty.value)
+  if (info.peeked === true) {
+    updateBookmark({
+      id: info.id,
+      title: info.title,
+      url: info.url,
+    })
+    return
+  }
 
   let result = true
   if (isPasswordEmpty.value) {
@@ -472,6 +480,8 @@ async function updateUnlockPassword(
   } else {
     console.log('Resolve Value:', unlockBookmarkResolve.value)
   }
+
+  refreshBookmarkTree()
 }
 
 onMounted(() => {

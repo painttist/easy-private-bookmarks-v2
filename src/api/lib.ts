@@ -7,6 +7,7 @@ export type BookmarkInfo = {
   title: string
   url: string | undefined
   id: string
+  peeked?: boolean
 }
 
 export type BookmarkProcessedInfo = {

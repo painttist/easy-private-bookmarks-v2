@@ -93,7 +93,7 @@ const props = defineProps<{
   node: BookmarkProcessedInfo
 }>()
 
-const locked = computed(() => props.node.url && isLockedURL(props.node.url))
+const locked = computed(() => props.node.url && isLockedURL(props.node.url) || props.node.peeked)
 const isFolder = computed(() => !props.node.url)
 
 const faviconUrl = computed(() => {
