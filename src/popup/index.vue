@@ -1,29 +1,23 @@
 <script setup lang="ts">
 // const bookmarks = ref<chrome.bookmarks.BookmarkTreeNode[]>([])
 
-import { manageBookmarkKey, passwordKey } from '../api/injectkeys'
+import { manageBookmarkKey } from '../api/injectkeys'
 import { migrate, getKeyPair, removeKeyPair, storeKeyPair } from '../api/keys'
 import {
   BookmarkInfo,
-  BookmarkStoreInfo,
   DEFAULT_KEYTIMEOUT,
   decryptData,
-  generateHashForPassword,
-  generateNewURLFromFrag,
   getEncryptedLink,
   generateEncryptedPrivateKeyPair,
-  isLockedURL,
   processNodes,
-  urlSupportIdentifier,
   BookmarkProcessedInfo,
+  decryptKey,
 } from '../api/lib'
-import { decryptFragment, generateFragment } from '../api/link'
 
 const bookmarks = ref<BookmarkProcessedInfo[]>([])
 const rawInfo = ref<chrome.bookmarks.BookmarkTreeNode[] | undefined>(undefined)
 
 const elmInput = ref<HTMLInputElement | null>(null)
-const elmScrollContainer = ref<HTMLElement | null>(null)
 
 const searchQuery = ref('')
 const filtering = ref(false)
@@ -35,8 +29,6 @@ chrome.bookmarks.getTree((tree) => {
   }
 })
 
-const testPassword = ref('12345687')
-
 const publickKey = ref('')
 const privateKeyEncrypted = ref('')
 
@@ -46,19 +38,20 @@ const isLockEmpty = computed(() => {
 
 const unloackPassword = ref('')
 
+const isPasswordEmpty = computed(() => {
+  return !unloackPassword.value
+})
+
 enum Modals {
   None,
   Lock,
   Unlock,
+  Retry,
+  WarnRemoveLock,
   WarnDeleteKey,
 }
 
 const activeModal = ref(Modals.None)
-
-const elmModelUnlock = ref<HTMLElement | null>(null)
-const elmModelLock = ref<HTMLElement | null>(null)
-
-const urlBase = chrome.runtime.getURL('options.html')
 
 async function initialize() {
   // migrate from v1
@@ -201,28 +194,82 @@ const deleteBookmark = async (id: string) => {
 const lockBookmark = async (info: BookmarkInfo) => {
   if (!info.url) return
 
-  let newLink = await getEncryptedLink(
-    {
-      url: info.url,
-      title: info.title,
-    },
-    publickKey.value
+  if (isLockEmpty.value) {
+    activeModal.value = Modals.Lock
+    return
+  }
+
+  try {
+    let newLink = await getEncryptedLink(
+      {
+        url: info.url,
+        title: info.title,
+      },
+      publickKey.value
+    )
+
+    if (!newLink) return
+
+    updateBookmark({
+      id: info.id,
+      title: 'Locked',
+      url: newLink,
+    })
+  } catch (error) {
+    console.log("Couldn't lock bookmark", error)
+  }
+}
+
+const peakBookmark = async (info: BookmarkInfo) => {
+  if (!info.url) return
+
+  if (isLockEmpty.value) {
+    activeModal.value = Modals.Unlock
+    return
+  }
+
+  let storedInfo = await decryptLockedLinkv2(
+    info.url,
+    unloackPassword.value,
+    privateKeyEncrypted.value
   )
 
-  if (!newLink) return
+  if (!storedInfo) return
 
   updateBookmark({
     id: info.id,
-    title: 'Locked',
-    url: newLink,
+    title: storedInfo.title,
+    url: storedInfo.url,
   })
 }
+
+const unlockBookmarkResolve: any = ref(null)
+
 const unlockBookmark = async (info: BookmarkInfo) => {
   if (!info.url) return
+
+  console.log("Unlock Bookmark")
+
+  console.log('isPasswordEmpty.value', isPasswordEmpty.value)
+
+  let result = true
+  if (isPasswordEmpty.value) {
+    activeModal.value = Modals.Unlock
+    let p = new Promise<boolean>((resolve) => {
+      if (unlockBookmarkResolve.value !== null)
+        unlockBookmarkResolve.value(false)
+      console.log('resolve', resolve)
+      unlockBookmarkResolve.value = resolve
+    })
+    console.log("Promise!", p)
+    result = await p
+  }
+  if (result === false) return
+
   try {
     let storedInfo = await decryptLockedLinkv2(
       info.url,
-      testPassword.value,
+      unloackPassword.value,
       privateKeyEncrypted.value
     )
 
@@ -234,7 +281,8 @@ const unlockBookmark = async (info: BookmarkInfo) => {
       url: storedInfo.url,
     })
   } catch (error) {
-    console.log(error)
+    console.log('Cannot decrypt bookmark')
+    activeModal.value = Modals.Retry
   }
 }
 
@@ -291,6 +339,32 @@ function toggleFilter() {
   )
 }
 
+// MODALS RELATED
+
+async function verifyPassword(password: string): Promise<boolean> {
+  let encryptedPrivateKey = privateKeyEncrypted.value
+  if (encryptedPrivateKey === '' || password === '') {
+    return false
+  }
+  try {
+    await decryptKey(encryptedPrivateKey, password)
+    updateUnlockPassword(password, true)
+    return true
+  } catch (error) {
+    console.log('Cannot decrypt private key [retry]')
+    return false
+  }
+}
+
+async function verifyRetryPassword(password: string) {
+  let success = await verifyPassword(password)
+  if (success) {
+    clearModal()
+  } else {
+    activeModal.value = Modals.Retry
+  }
+}
+
 async function setNewPassword(newPassword: string, updateChrome: boolean) {
   if (newPassword === '') {
     if (updateChrome) {
@@ -312,13 +386,22 @@ function clearModal() {
   activeModal.value = Modals.None
 }
 
-async function updateUnlockPassword({
-  newPassword,
-  updateChrome,
-}: {
-  newPassword: string
+function handleBtnKeyClick() {
+
+  if (unlockBookmarkResolve.value !== null)
+    unlockBookmarkResolve.value(false)
+
+  if (isPasswordEmpty.value) {
+    activeModal.value = Modals.Unlock
+  } else {
+    activeModal.value = Modals.WarnDeleteKey
+  }
+}
+
+async function updateUnlockPassword(
+  newPassword: string,
   updateChrome: boolean
-}) {
+) {
   if (updateChrome) {
     await chrome.storage.local.set({ 'unlock-password': newPassword })
 
@@ -342,21 +425,14 @@ async function updateUnlockPassword({
 
   console.log('Updated Unlock Password')
   unloackPassword.value = newPassword
-  activeModal.value = Modals.None
-}
 
-async function handleAddClick() {
-  // genereate a new key pair
-  let keyPair = await generateEncryptedPrivateKeyPair(testPassword.value)
-  await storeKeyPair(keyPair.jwkPublicKey, keyPair.encryptedPrivateKey)
-  publickKey.value = JSON.stringify(keyPair.jwkPublicKey)
-  privateKeyEncrypted.value = keyPair.encryptedPrivateKey
-}
-
-function handleDeleteClick() {
-  removeKeyPair()
-  publickKey.value = ''
-  privateKeyEncrypted.value = ''
+  if (unlockBookmarkResolve.value !== null) {
+    console.log('Trying to resolve')
+    unlockBookmarkResolve.value(true)
+    unlockBookmarkResolve.value = null
+  } else {
+    console.log('Resolve Value:', unlockBookmarkResolve.value)
+  }
 }
 
 onMounted(() => {
@@ -370,16 +446,11 @@ onMounted(() => {
 
     if (!expireTime) {
       // first time open
-      // activeModal.value = Modals.Lock
     } else if (expireTime > Date.now()) {
       // The key is still ok
       chrome.storage.local.get('unlock-password', (data) => {
         let lockPassword = data['unlock-password']
-        if (lockPassword)
-          updateUnlockPassword({
-            newPassword: lockPassword,
-            updateChrome: false,
-          })
+        if (lockPassword) updateUnlockPassword(lockPassword, false)
       })
     } else {
       // key is expired
@@ -391,7 +462,6 @@ onMounted(() => {
 
 <template>
   <modal-password
-    ref="elmModelLock"
     :opened="activeModal == Modals.Lock"
     :message="'One-time Lock Setup'"
     :requiresConfirm="true"
@@ -401,24 +471,46 @@ onMounted(() => {
   >
   </modal-password>
   <modal-password
-    ref="elmModelUnlock"
     :opened="activeModal == Modals.Unlock"
-    :message="'Need a key to unlock'"
+    :message="'Enter Password'"
     :requiresConfirm="false"
-    :inputPlaceholders="['Password please']"
-    @panel-confirm="updateUnlockPassword"
+    :inputPlaceholders="['password']"
+    @panel-confirm="
+      verifyPassword($event).then((success) =>
+        success ? clearModal() : (activeModal = Modals.Retry)
+      )
+    "
+    @panel-close="clearModal"
+  >
+  </modal-password>
+  <modal-password
+    :opened="activeModal == Modals.Retry"
+    :message="'Password Incorrect'"
+    :requiresConfirm="false"
+    :inputPlaceholders="['password']"
+    @panel-confirm="verifyRetryPassword"
     @panel-close="clearModal"
   >
   </modal-password>
   <modal-warning
-    ref="elmModeleWarning"
-    :opened="activeModal == Modals.WarnDeleteKey"
-    :title="'Delete Key?'"
-    :message="`- This won\'t unlock bookmarks.
-- Removes hash for locking without password.
-- Need a password to lock again.
-- Existing passwords won't change. `"
+    :opened="activeModal == Modals.WarnRemoveLock"
+    :isDanger="true"
+    :title="'Remove Lock?'"
+    :message="`- Locked bookmarks will be lost!
+- The same password won't unlock again.
+- Please unlock all bookmarks first to keep them`"
     @panel-confirm="setNewPassword('', true).then(clearModal)"
+    @panel-close="clearModal"
+  >
+  </modal-warning>
+  <modal-warning
+    :opened="activeModal == Modals.WarnDeleteKey"
+    :isDanger="false"
+    :title="'Delete Tempary Key?'"
+    :message="`Key will automatically be deleted after ${
+      DEFAULT_KEYTIMEOUT / 1000
+    } seconds. Confirm to delete now?`"
+    @panel-confirm="updateUnlockPassword('', true).then(clearModal)"
     @panel-close="clearModal"
   >
   </modal-warning>
@@ -428,31 +520,48 @@ onMounted(() => {
         :title="`${isLockEmpty ? 'Add Lock' : 'Remove Lock'}`"
         class="p-2 text-base rounded transition-colors"
         :class="{
-          'bg-blue-200 text-blue-800 hover:text-black': isLockEmpty,
-          'bg-purple-200 text-purple-900 hover:text-purple-700': !isLockEmpty,
+          'bg-blue-200 text-blue-600 hover:text-blue-800': isLockEmpty,
+          'bg-purple-200 text-purple-600 hover:text-purple-800': !isLockEmpty,
         }"
         @click="
           isLockEmpty
             ? (activeModal = Modals.Lock)
-            : (activeModal = Modals.WarnDeleteKey)
+            : (activeModal = Modals.WarnRemoveLock)
         "
       >
         <icon-mdi-lock-open v-if="isLockEmpty" />
         <icon-mdi-lock v-if="!isLockEmpty" />
       </button>
       <button
-        title="Filter Locked URL"
+        :title="
+          isPasswordEmpty ? 'Add Tempary Password' : 'Remove Tempary Password'
+        "
         class="p-2 text-base rounded transition-colors duration-200"
-        :class="{}"
-        @click="handleAddClick"
+        :class="{
+          'hover:bg-white text-gray-800 hover:text-black': isPasswordEmpty,
+          'bg-purple-200 text-purple-900 hover:text-purple-700':
+            !isPasswordEmpty,
+        }"
+        @click="
+          handleBtnKeyClick
+        "
       >
-        <icon-mdi-key />
+        <icon-material-symbols-key-off v-if="isPasswordEmpty" />
+        <icon-material-symbols-key v-if="!isPasswordEmpty" />
       </button>
       <button
         title="Filter Locked URL"
         class="p-2 text-base rounded transition-colors duration-200"
         :class="{}"
-        @click="handleDeleteClick"
+        @click="activeModal = Modals.Unlock"
+      >
+        <icon-mdi-eye />
+      </button>
+      <button
+        title="Filter Locked URL"
+        class="p-2 text-base rounded transition-colors duration-200"
+        :class="{}"
+        @click=""
       >
         <icon-mdi-delete />
       </button>
@@ -473,20 +582,20 @@ onMounted(() => {
         title="Filter Locked URL"
         class="p-2 text-base rounded transition-colors duration-200"
         :class="{
-          'bg-yellow-400 hover:bg-yellow-300 text-yellow-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500':
+          'bg-amber-200 hover:text-amber-800 text-amber-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500':
             filtering,
-          'bg-white hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400':
+          'hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400':
             !filtering,
         }"
         @click="toggleFilter"
       >
-        <icon-mdi-filter />
+        <icon-material-symbols-filter-alt v-if="filtering" />
+        <icon-material-symbols-filter-alt-off v-if="!filtering" />
       </button>
     </div>
-    <div class="h-[400px]">
+    <div class="h-[400px] mt-2">
       <div
         class="transition-vertical ease-[cubic-bezier(0.25, 1, 0.5, 1)] duration-200 overflow-hidden bg-gray-100"
-        ref="elmScrollContainer"
         :class="{
           'h-0': bookmarks.length == 0,
           'h-[400px]': bookmarks.length > 0,

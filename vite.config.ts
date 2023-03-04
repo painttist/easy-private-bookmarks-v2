@@ -34,7 +34,10 @@ export default defineConfig({
         // auto import icons
         IconsResolver({
           prefix: 'icon',
-          enabledCollections: ['mdi'],
+          // alias: {
+          //   ms: "material-symbols",
+          // }
+          // enabledCollections: ['mdi', 'material-symbols'],
         }),
       ],
     }),

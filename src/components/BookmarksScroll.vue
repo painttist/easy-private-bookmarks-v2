@@ -3,7 +3,7 @@
   <!-- <icon-mdi-apple class="text-black inline-block" /> -->
   <div>
     <recycle-scroller
-      class="scrollbar h-[400px] mt-2 pr-1.5"
+      class="scrollbar h-[400px] pr-1.5"
       :items="list"
       ref="scrollerRef"
       :item-size="30"

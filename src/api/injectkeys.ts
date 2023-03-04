@@ -1,10 +1,5 @@
 import { BookmarkInfo } from './lib'
 
-export const passwordKey = Symbol() as InjectionKey<{
-  lockHash: Ref<string>
-  unlockPassword: Ref<string>
-}>
-
 export const manageBookmarkKey = Symbol() as InjectionKey<{
   openFolder: (id: string) => void
   closeFolder: (id: string) => void

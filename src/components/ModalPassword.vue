@@ -5,7 +5,7 @@
         :message="message"
         v-if="opened"
       >
-        <div class="px-8 pb-4">
+        <div class="px-8 pb-4 w-full">
           <div class="relative">
             <input
               class="w-full text-base py-2 px-4 bg-gray-100 my-2"
@@ -34,13 +34,13 @@
           <div class="flex w-full mb-2 mt-2 justify-end text-center gap-2">
             <button
               @click="onLaterBtn"
-              class="rounded-md p-2 flex flex-col cursor-pointer items-center w-16 bg-gray-100 text-gray-600 hover:text-gray-800 transition-colors"
+              class="rounded-md p-2 flex flex-col cursor-pointer items-center w-16 bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-800 transition-colors"
             >
               <icon-mdi-clock class="text-lg" />Later
             </button>
             <button
               @click="onConfirmBtn"
-              class="rounded-md p-2 flex flex-col cursor-pointer items-center w-16 bg-emerald-400 hover:bg-emerald-300 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-default transition-colors"
+              class="rounded-md p-2 flex flex-col cursor-pointer items-center w-16 bg-emerald-100 hover:bg-emerald-200 text-emerald-600 hover:text-emerald-800 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-default transition-colors"
               :disabled="!canConfirm"
             >
               <icon-mdi-check-bold class="text-lg" />Confirm

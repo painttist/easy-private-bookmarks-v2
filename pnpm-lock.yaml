@@ -2,7 +2,7 @@ lockfileVersion: 5.4
 
 specifiers:
   '@crxjs/vite-plugin': npm:@crxjs/vite-plugin@beta
-  '@iconify-json/mdi': ^1.1.47
+  '@iconify/json': ^2.2.30
   '@types/chrome': ^0.0.218
   '@types/node': ^18.14.1
   '@types/prettier': ^2.7.2
@@ -33,7 +33,7 @@ dependencies:
 
 devDependencies:
   '@crxjs/vite-plugin': 2.0.0-beta.14
-  '@iconify-json/mdi': 1.1.47
+  '@iconify/json': 2.2.30
   '@types/chrome': 0.0.218
   '@types/node': 18.14.1
   '@types/prettier': 2.7.2
@@ -493,10 +493,11 @@ packages:
     dev: true
     optional: true
 
-  /@iconify-json/mdi/1.1.47:
-    resolution: {integrity: sha512-5E5mazdQaMNl3gmLL7whteh61weJBRfW2R9Rq0/pgAe9B0j22mViyADm/ooHZx07Vkc0ZqnkgUrpT6OsS9Qhzg==}
+  /@iconify/json/2.2.30:
+    resolution: {integrity: sha512-F+eeFDEe+5iZ6wn/GrpQhycWN5XeULA17oPZdl8t+BuOwrq0rRWanB0sruGRir+SScsUuKR2TJyWTaQwmqtnvQ==}
     dependencies:
       '@iconify/types': 2.0.0
+      pathe: 1.1.0
     dev: true
 
   /@iconify/types/2.0.0:

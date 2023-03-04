@@ -26,7 +26,7 @@ export async function generateEncryptedPrivateKeyPair(password: string) {
   // Generate a new RSA key pair
   let keyPair = await crypt.getRSAKeyPair(
     2048,
-    'SHA-512',
+    'SHA-256',
     'RSA-OAEP',
     ['encrypt', 'decrypt'],
     true
@@ -35,7 +35,7 @@ export async function generateEncryptedPrivateKeyPair(password: string) {
     keyPair.privateKey,
     password,
     64000,
-    'SHA-512',
+    'SHA-256',
     'AES-GCM',
     256
   )
@@ -55,20 +55,25 @@ export async function getEncryptedLink(
   data: BookmarkStoreInfo,
   jwkPublicKey: string | undefined
 ) {
+  let fragment = await encryptData(data, jwkPublicKey)
+  if (!fragment) {
+    return ''
+  }
   return (
     baseURL +
     urlSupportIdentifier +
-    '#' +
-    (await encryptData(data, jwkPublicKey))
+    '#' + fragment
   )
 }
 
 async function encryptData(
   data: BookmarkStoreInfo,
   jwkPublicKey: string | undefined
-) {
+) : Promise<string> {
   let dataString = JSON.stringify(data)
-  let dataArray = new TextEncoder().encode(dataString)
+  console.log("Data to encrypt: ", dataString)
+  let enc = new TextEncoder()
+  let dataArray = enc.encode(dataString)
 
   let jwk
   if (!jwkPublicKey) {
@@ -83,27 +88,61 @@ async function encryptData(
     jwk = JSON.parse(jwkPublicKey)
   }
 
-  // console.log(jwk)
+  console.log(jwk)
 
   // convert the stored jwk public key to CryptoKey
-  let publicKey = await window.crypto.subtle.importKey(
-    'jwk',
-    jwk,
-    {
-      name: 'RSA-OAEP',
-      hash: 'SHA-512',
-    },
-    true,
-    ['encrypt']
-  )
+  let publicKey
+  try {
+    publicKey = await window.crypto.subtle.importKey(
+      'jwk',
+      jwk,
+      {
+        name: 'RSA-OAEP',
+        hash: 'SHA-256',
+      },
+      true,
+      ['encrypt']
+    )
+  } catch (error) {
+    console.log("Can't import JWK public key")
+    return ''
+  }
+
+  // console.log('Imported JWK public key', publicKey)
+  
+  // let encryptedBuffer
+  // try {
+  //   // console.log("Is secure context", window.isSecureContext)
+  //   encryptedBuffer = await window.crypto.subtle.encrypt(
+  //     {
+  //       name: 'RSA-OAEP',
+  //     },
+  //     publicKey,
+  //     dataArray
+  //   )
+  //   console.log('Encryption Successful')
+  //   let encryptedString = new TextDecoder().decode(encryptedBuffer)
+  // // console.log(encryptedString)
+  // } catch (error) {
+  //   console.log("Encryption failed", error)
+  // }
   return await crypt.rsaEncrypt(publicKey, dataArray)
+}
+
+export async function decryptKey(privateKey: string, password: string) {
+  return crypt.decryptPrivateKey(privateKey, password, {
+    name: 'RSA-OAEP',
+    hash: 'SHA-256',
+    usages: ['decrypt', 'unwrapKey'],
+    isExtractable: true,
+  })
 }
 
 export async function decryptData(
   encryptedData: string,
   password: string,
   encryptedPrivateKey: string | undefined
-) : Promise<BookmarkStoreInfo> {
+): Promise<BookmarkStoreInfo> {
   let privateKey
 
   if (encryptedPrivateKey) {
@@ -121,16 +160,7 @@ export async function decryptData(
   }
 
   // decrypt the stored private key
-  let decryptedPrivateKey = await crypt.decryptPrivateKey(
-    privateKey,
-    password,
-    {
-      name: 'RSA-OAEP',
-      hash: 'SHA-512',
-      usages: ['decrypt', 'unwrapKey'],
-      isExtractable: true,
-    }
-  )
+  let decryptedPrivateKey = await decryptKey(privateKey, password)
 
   let decryptedData = await crypt.rsaDecrypt(decryptedPrivateKey, encryptedData)
 
@@ -160,7 +190,7 @@ export function processNodes(
     } else if (
       object.url &&
       object.url.toLowerCase().includes(filter.toLowerCase()) &&
-      lockFilterCondition
+      !filterLocked
     ) {
       // Link contains filter
       result.push(object)

@@ -79,13 +79,11 @@
 </template>
 
 <script lang="ts" setup>
-import { manageBookmarkKey, passwordKey } from '../api/injectkeys'
+import { manageBookmarkKey } from '../api/injectkeys'
 import {
   BookmarkInfo,
   BookmarkProcessedInfo,
-  generateHashForPassword,
   isLockedURL,
-  urlSupportIdentifier,
 } from '../api/lib'
 
 import { generateFragment, decryptFragment } from '../api/link'
@@ -99,7 +97,7 @@ const locked = computed(() => props.node.url && isLockedURL(props.node.url))
 const isFolder = computed(() => !props.node.url)
 
 const faviconUrl = computed(() => {
-  console.log('Get favicon')
+  // console.log('Get favicon')
   return (
     (props.node.url &&
       `https://www.google.com/s2/favicons?domain=${
