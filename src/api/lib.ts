@@ -15,6 +15,7 @@ export type BookmarkProcessedInfo = {
   level: number
   id: string
   open: boolean
+  peeked: boolean
 }
 
 export type BookmarkStoreInfo = {
@@ -25,7 +26,7 @@ export type BookmarkStoreInfo = {
 export async function generateEncryptedPrivateKeyPair(password: string) {
   // Generate a new RSA key pair
   let keyPair = await crypt.getRSAKeyPair(
-    2048,
+    4096,
     'SHA-256',
     'RSA-OAEP',
     ['encrypt', 'decrypt'],
@@ -59,19 +60,15 @@ export async function getEncryptedLink(
   if (!fragment) {
     return ''
   }
-  return (
-    baseURL +
-    urlSupportIdentifier +
-    '#' + fragment
-  )
+  return baseURL + urlSupportIdentifier + '#' + fragment
 }
 
 async function encryptData(
   data: BookmarkStoreInfo,
   jwkPublicKey: string | undefined
-) : Promise<string> {
+): Promise<string> {
   let dataString = JSON.stringify(data)
-  console.log("Data to encrypt: ", dataString)
+  // console.log('Data to encrypt: ', dataString)
   let enc = new TextEncoder()
   let dataArray = enc.encode(dataString)
 
@@ -88,7 +85,7 @@ async function encryptData(
     jwk = JSON.parse(jwkPublicKey)
   }
 
-  console.log(jwk)
+  // console.log(jwk)
 
   // convert the stored jwk public key to CryptoKey
   let publicKey
@@ -109,7 +106,7 @@ async function encryptData(
   }
 
   // console.log('Imported JWK public key', publicKey)
-  
+
   // let encryptedBuffer
   // try {
   //   // console.log("Is secure context", window.isSecureContext)
@@ -167,10 +164,15 @@ export async function decryptData(
   return JSON.parse(new TextDecoder().decode(decryptedData))
 }
 
-export function processNodes(
-  nodes: chrome.bookmarks.BookmarkTreeNode[],
+export async function processNodes(
+  nodes: readonly chrome.bookmarks.BookmarkTreeNode[],
   filter: string,
-  filterLocked: boolean
+  filterLocked: boolean,
+  peeking: boolean,
+  lockPassword: string,
+  privateKey: string,
+  peekCache: Map<string, BookmarkStoreInfo | undefined>,
+  peekCallBack: (id: string, data: BookmarkStoreInfo | undefined) => void
 ) {
   const getNodes = (
     result: chrome.bookmarks.BookmarkTreeNode[],
@@ -212,21 +214,75 @@ export function processNodes(
   }
 
   let level = 0
-  const getDivs = (
-    result: BookmarkProcessedInfo[],
+  let delayNum = 0
+  const getDivs = async (
+    accum: Promise<BookmarkProcessedInfo[]>,
     object: chrome.bookmarks.BookmarkTreeNode
   ) => {
+    let result = await accum
+    if (
+      peeking &&
+      lockPassword &&
+      privateKey &&
+      object.url &&
+      isLockedURL(object.url)
+    ) {
+      let encryptedData = object.url.split('#')[1]
+      if (!encryptedData) {
+        return result
+      }
+
+      console.log('Peeking', object.url)
+      // decrypt the url
+
+      if (peekCache.has(encryptedData)) {
+        let decryptedData = peekCache.get(encryptedData)
+        if (decryptedData !== undefined) {
+          result.push({
+            title: decryptedData.title,
+            url: decryptedData.url,
+            level: level,
+            id: object.id,
+            open: true,
+            peeked: true,
+          })
+          return result
+        }
+      } else {
+        decryptData(encryptedData, lockPassword, privateKey)
+          .then(async (decryptedData) => {
+            delayNum += 1
+            await new Promise((resolve) => setTimeout(resolve, delayNum * 50))
+            peekCallBack(object.id, decryptedData)
+            peekCache.set(encryptedData, decryptedData)
+          })
+          .catch((error) => {
+            console.log('Error peeking', error)
+            peekCache.set(encryptedData, undefined)
+          })
+        // result.push({
+        //   title: decryptedData.title,
+        //   url: decryptedData.url,
+        //   level: level,
+        //   id: object.id,
+        //   open: true,
+        // })
+        // return result
+      }
+    }
+
     result.push({
       title: object.title,
       url: object.url,
       level: level,
       id: object.id,
       open: true,
+      peeked: false,
     })
 
     if (Array.isArray(object.children)) {
       level += 1
-      const divs = object.children.reduce(getDivs, [])
+      const divs = await object.children.reduce(getDivs, Promise.resolve([]))
       // console.log("Children divs", divs)
       result.push(...divs)
       level -= 1
@@ -235,7 +291,7 @@ export function processNodes(
   }
 
   let filtered = nodes.reduce(getNodes, [])
-  let divs = filtered.reduce(getDivs, [])
+  let divs = filtered.reduce(getDivs, Promise.resolve([]))
 
   return divs
 }

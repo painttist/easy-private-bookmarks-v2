@@ -12,6 +12,7 @@ import {
   processNodes,
   BookmarkProcessedInfo,
   decryptKey,
+  BookmarkStoreInfo,
 } from '../api/lib'
 
 const bookmarks = ref<BookmarkProcessedInfo[]>([])
@@ -21,12 +22,11 @@ const elmInput = ref<HTMLInputElement | null>(null)
 
 const searchQuery = ref('')
 const filtering = ref(false)
+const peeking = ref(false)
 
 chrome.bookmarks.getTree((tree) => {
   rawInfo.value = tree?.[0]?.children?.[0]?.children
-  if (rawInfo.value) {
-    bookmarks.value = processNodes(rawInfo.value, '', filtering.value)
-  }
+  refreshBookmarkTree()
 })
 
 const publickKey = ref('')
@@ -36,10 +36,10 @@ const isLockEmpty = computed(() => {
   return !privateKeyEncrypted.value || !publickKey.value
 })
 
-const unloackPassword = ref('')
+const unlockPassword = ref('')
 
 const isPasswordEmpty = computed(() => {
-  return !unloackPassword.value
+  return !unlockPassword.value
 })
 
 enum Modals {
@@ -93,6 +93,22 @@ onBeforeMount(async () => {
   // console.log(lockHash.value)
 })
 
+let peekCache = new Map<string, BookmarkStoreInfo>()
+
+const peekNodesCallback = (id: string, data: BookmarkStoreInfo | undefined) => {
+  if (data) {
+    let idx = bookmarks.value.findIndex((item) => {
+      return item.id == id
+    })
+    if (peeking.value) {
+      bookmarks.value[idx].url = data.url
+      bookmarks.value[idx].title = data.title
+    }
+  } else {
+    // do nothing
+  }
+}
+
 const openFolder = (id: string) => {
   // pass
   if (!bookmarks.value) return
@@ -104,18 +120,27 @@ const openFolder = (id: string) => {
 
   let newBookmarks = bookmarks.value.slice()
 
-  chrome.bookmarks.getSubTree(id, (node) => {
+  chrome.bookmarks.getSubTree(id, async (node) => {
     // console.log('Got node', node[0])
     if (!node[0].children) return
+    let nodes = await processNodes(
+      node[0].children,
+      searchQuery.value,
+      filtering.value,
+      peeking.value,
+      unlockPassword.value,
+      privateKeyEncrypted.value,
+      peekCache,
+      peekNodesCallback
+    )
+
     newBookmarks.splice(
       folderIndex + 1,
       0,
-      ...processNodes(node[0].children, searchQuery.value, filtering.value).map(
-        (item) => {
-          item.level = item.level + itemLevel
-          return item
-        }
-      )
+      ...nodes.map((item) => {
+        item.level = item.level + itemLevel
+        return item
+      })
     )
     newBookmarks[folderIndex].open = true
     bookmarks.value = newBookmarks
@@ -144,6 +169,21 @@ const closeFolder = (id: string) => {
   bookmarks.value = newBookmarks
 }
 
+const refreshBookmarkTree = async () => {
+  if (rawInfo.value) {
+    bookmarks.value = await processNodes(
+      rawInfo.value,
+      searchQuery.value,
+      filtering.value,
+      peeking.value,
+      unlockPassword.value,
+      privateKeyEncrypted.value,
+      peekCache,
+      peekNodesCallback
+    )
+  }
+}
+
 const updateBookmark = async (newNode: BookmarkInfo) => {
   if (!bookmarks.value) return
 
@@ -160,13 +200,7 @@ const updateBookmark = async (newNode: BookmarkInfo) => {
   let tree = await chrome.bookmarks.getTree()
   rawInfo.value = tree?.[0]?.children?.[0]?.children
 
-  if (rawInfo.value) {
-    bookmarks.value = processNodes(
-      rawInfo.value,
-      searchQuery.value,
-      filtering.value
-    )
-  }
+  refreshBookmarkTree()
 }
 
 const deleteBookmark = async (id: string) => {
@@ -182,13 +216,7 @@ const deleteBookmark = async (id: string) => {
   let tree = await chrome.bookmarks.getTree()
   rawInfo.value = tree?.[0]?.children?.[0]?.children
 
-  if (rawInfo.value) {
-    bookmarks.value = processNodes(
-      rawInfo.value,
-      searchQuery.value,
-      filtering.value
-    )
-  }
+  refreshBookmarkTree()
 }
 
 const lockBookmark = async (info: BookmarkInfo) => {
@@ -220,7 +248,7 @@ const lockBookmark = async (info: BookmarkInfo) => {
   }
 }
 
-const peakBookmark = async (info: BookmarkInfo) => {
+const peekBookmark = async (info: BookmarkInfo) => {
   if (!info.url) return
 
   if (isLockEmpty.value) {
@@ -230,7 +258,7 @@ const peakBookmark = async (info: BookmarkInfo) => {
 
   let storedInfo = await decryptLockedLinkv2(
     info.url,
-    unloackPassword.value,
+    unlockPassword.value,
     privateKeyEncrypted.value
   )
 
@@ -248,7 +276,7 @@ const unlockBookmarkResolve: any = ref(null)
 const unlockBookmark = async (info: BookmarkInfo) => {
   if (!info.url) return
 
-  console.log("Unlock Bookmark")
+  console.log('Unlock Bookmark')
 
   console.log('isPasswordEmpty.value', isPasswordEmpty.value)
 
@@ -258,10 +286,10 @@ const unlockBookmark = async (info: BookmarkInfo) => {
     let p = new Promise<boolean>((resolve) => {
       if (unlockBookmarkResolve.value !== null)
         unlockBookmarkResolve.value(false)
-      console.log('resolve', resolve)
+      // console.log('resolve', resolve)
       unlockBookmarkResolve.value = resolve
     })
-    console.log("Promise!", p)
+    // console.log("Promise!", p)
     result = await p
   }
   if (result === false) return
@@ -269,7 +297,7 @@ const unlockBookmark = async (info: BookmarkInfo) => {
   try {
     let storedInfo = await decryptLockedLinkv2(
       info.url,
-      unloackPassword.value,
+      unlockPassword.value,
       privateKeyEncrypted.value
     )
 
@@ -308,11 +336,7 @@ function updateSearch(e: KeyboardEvent) {
   if (rawInfo.value === undefined) {
     return
   }
-  bookmarks.value = processNodes(
-    rawInfo.value,
-    searchQuery.value,
-    filtering.value
-  )
+  refreshBookmarkTree()
 }
 
 function clearSearch(e: KeyboardEvent) {
@@ -332,11 +356,7 @@ function toggleFilter() {
   } else {
     // searchQuery.value = ''
   }
-  bookmarks.value = processNodes(
-    rawInfo.value,
-    searchQuery.value,
-    filtering.value
-  )
+  refreshBookmarkTree()
 }
 
 // MODALS RELATED
@@ -387,9 +407,7 @@ function clearModal() {
 }
 
 function handleBtnKeyClick() {
-
-  if (unlockBookmarkResolve.value !== null)
-    unlockBookmarkResolve.value(false)
+  if (unlockBookmarkResolve.value !== null) unlockBookmarkResolve.value(false)
 
   if (isPasswordEmpty.value) {
     activeModal.value = Modals.Unlock
@@ -398,10 +416,31 @@ function handleBtnKeyClick() {
   }
 }
 
+async function handlePeekClick() {
+  if (isLockEmpty.value) return
+  let result
+  if (isPasswordEmpty.value) {
+    activeModal.value = Modals.Unlock
+    let p = new Promise<boolean>((resolve) => {
+      if (unlockBookmarkResolve.value !== null)
+        unlockBookmarkResolve.value(false)
+      unlockBookmarkResolve.value = resolve
+    })
+    result = await p
+  }
+  if (result === false) return
+  peeking.value = !peeking.value
+  refreshBookmarkTree()
+}
+
 async function updateUnlockPassword(
   newPassword: string,
   updateChrome: boolean
 ) {
+  if (newPassword === '') {
+    peeking.value = false
+  }
+
   if (updateChrome) {
     await chrome.storage.local.set({ 'unlock-password': newPassword })
 
@@ -424,7 +463,7 @@ async function updateUnlockPassword(
   }
 
   console.log('Updated Unlock Password')
-  unloackPassword.value = newPassword
+  unlockPassword.value = newPassword
 
   if (unlockBookmarkResolve.value !== null) {
     console.log('Trying to resolve')
@@ -542,29 +581,19 @@ onMounted(() => {
           'bg-purple-200 text-purple-900 hover:text-purple-700':
             !isPasswordEmpty,
         }"
-        @click="
-          handleBtnKeyClick
-        "
+        @click="handleBtnKeyClick"
       >
         <icon-material-symbols-key-off v-if="isPasswordEmpty" />
         <icon-material-symbols-key v-if="!isPasswordEmpty" />
       </button>
-      <button
-        title="Filter Locked URL"
-        class="p-2 text-base rounded transition-colors duration-200"
-        :class="{}"
-        @click="activeModal = Modals.Unlock"
-      >
-        <icon-mdi-eye />
-      </button>
-      <button
+      <!-- <button
         title="Filter Locked URL"
         class="p-2 text-base rounded transition-colors duration-200"
         :class="{}"
         @click=""
       >
         <icon-mdi-delete />
-      </button>
+      </button> -->
       <div class="relative w-full">
         <input
           ref="elmInput"
@@ -579,7 +608,21 @@ onMounted(() => {
         />
       </div>
       <button
-        title="Filter Locked URL"
+        :title="!peeking ? 'Peek Locked URL' : 'Hide Locked URL'"
+        class="p-2 text-base rounded transition-colors duration-200"
+        :class="{
+          'bg-blue-200 hover:text-blue-800 text-blue-600 focus-visible:outline-none':
+            peeking,
+          'hover:bg-white': !peeking,
+        }"
+        @click="handlePeekClick"
+        :disabled="isLockEmpty"
+      >
+        <icon-material-symbols-visibility-off v-if="!peeking" />
+        <icon-material-symbols-visibility v-if="peeking" />
+      </button>
+      <button
+        :title="filtering ? 'Remove Filter' : 'Filter Locked URL'"
         class="p-2 text-base rounded transition-colors duration-200"
         :class="{
           'bg-amber-200 hover:text-amber-800 text-amber-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500':

@@ -17,6 +17,8 @@ declare module '@vue/runtime-core' {
     IconMaterialSymbolsFilterAltOff: typeof import('~icons/material-symbols/filter-alt-off')['default']
     IconMaterialSymbolsKey: typeof import('~icons/material-symbols/key')['default']
     IconMaterialSymbolsKeyOff: typeof import('~icons/material-symbols/key-off')['default']
+    IconMaterialSymbolsVisibility: typeof import('~icons/material-symbols/visibility')['default']
+    IconMaterialSymbolsVisibilityOff: typeof import('~icons/material-symbols/visibility-off')['default']
     IconMdiApple: typeof import('~icons/mdi/apple')['default']
     IconMdiBookmark: typeof import('~icons/mdi/bookmark')['default']
     IconMdiBookmarkBox: typeof import('~icons/mdi/bookmark-box')['default']
