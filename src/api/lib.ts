@@ -7,7 +7,14 @@ export type BookmarkInfo = {
   title: string
   url: string | undefined
   id: string
-  peeked?: boolean
+  peekState?: PeekState
+}
+
+export enum PeekState {
+  None,
+  Unlocking,
+  Peeked,
+  Failed,
 }
 
 export type BookmarkProcessedInfo = {
@@ -16,7 +23,7 @@ export type BookmarkProcessedInfo = {
   level: number
   id: string
   open: boolean
-  peeked: boolean
+  peekState: PeekState
 }
 
 export type BookmarkStoreInfo = {
@@ -245,7 +252,7 @@ export async function processNodes(
             level: level,
             id: object.id,
             open: true,
-            peeked: true,
+            peekState: PeekState.Peeked,
           })
           return result
         }
@@ -253,22 +260,25 @@ export async function processNodes(
         decryptData(encryptedData, lockPassword, privateKey)
           .then(async (decryptedData) => {
             delayNum += 1
-            await new Promise((resolve) => setTimeout(resolve, delayNum * 50))
-            peekCallBack(object.id, decryptedData)
+            // TODO remove this delay
+            await new Promise((resolve) => setTimeout(resolve, delayNum * 100))
             peekCache.set(encryptedData, decryptedData)
+            peekCallBack(object.id, decryptedData)
           })
           .catch((error) => {
-            console.log('Error peeking', error)
             peekCache.set(encryptedData, undefined)
+            peekCallBack(object.id, undefined)
+            console.log('Error peeking', error)
           })
-        // result.push({
-        //   title: decryptedData.title,
-        //   url: decryptedData.url,
-        //   level: level,
-        //   id: object.id,
-        //   open: true,
-        // })
-        // return result
+        result.push({
+          title: object.title,
+          url: object.url,
+          level: level,
+          id: object.id,
+          open: true,
+          peekState: PeekState.Unlocking,
+        })
+        return result
       }
     }
 
@@ -278,7 +288,7 @@ export async function processNodes(
       level: level,
       id: object.id,
       open: true,
-      peeked: false,
+      peekState: PeekState.None,
     })
 
     if (Array.isArray(object.children)) {
@@ -307,7 +317,8 @@ export function generateNewURLFromFrag(frag: string) {
   return baseURL + urlSupportIdentifier + '#' + frag
 }
 
-export function isLockedURL(url: string) {
+export function isLockedURL(url?: string) {
+  if (!url) return false
   return (
     url.includes(urlSupportIdentifier) ||
     (url.includes(baseURL) && url.includes('#')) ||

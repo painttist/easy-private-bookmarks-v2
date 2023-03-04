@@ -49,7 +49,11 @@
           'text-purple-500': locked,
         }"
       >
-        {{ node.title || node.url?.match(/\w*\.?\w*\.\w*/)?.[0] }}
+        {{
+          isUnlocking
+            ? 'Peeking inside ...'
+            : node.title || node.url?.match(/\w*\.?\w*\.\w*/)?.[0]
+        }}
       </div>
       <!-- Controls -->
       <div
@@ -79,12 +83,8 @@
 </template>
 
 <script lang="ts" setup>
-import { manageBookmarkKey } from '../api/injectkeys'
-import {
-  BookmarkInfo,
-  BookmarkProcessedInfo,
-  isLockedURL,
-} from '../api/lib'
+import { manageBookmarkKey, peekInfoKey } from '../api/injectkeys'
+import { BookmarkInfo, BookmarkProcessedInfo, isLockedURL, PeekState } from '../api/lib'
 
 import { generateFragment, decryptFragment } from '../api/link'
 const urlBase = chrome.runtime.getURL('options.html')
@@ -93,7 +93,15 @@ const props = defineProps<{
   node: BookmarkProcessedInfo
 }>()
 
-const locked = computed(() => props.node.url && isLockedURL(props.node.url) || props.node.peeked)
+// const peekInfo = inject(peekInfoKey)
+
+const isUnlocking = computed(() => {
+  return props.node.peekState === PeekState.Unlocking
+  // return peekInfo?.peeking.value && isLockedURL(props.node.url)
+})
+const locked = computed(
+  () => (props.node.url && isLockedURL(props.node.url)) || props.node.peekState !== PeekState.None
+)
 const isFolder = computed(() => !props.node.url)
 
 const faviconUrl = computed(() => {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // const bookmarks = ref<chrome.bookmarks.BookmarkTreeNode[]>([])
 
-import { manageBookmarkKey } from '../api/injectkeys'
+import { manageBookmarkKey, peekInfoKey } from '../api/injectkeys'
 import { migrate, getKeyPair, removeKeyPair, storeKeyPair } from '../api/keys'
 import {
   BookmarkInfo,
@@ -13,6 +13,7 @@ import {
   BookmarkProcessedInfo,
   decryptKey,
   BookmarkStoreInfo,
+PeekState,
 } from '../api/lib'
 
 const bookmarks = ref<BookmarkProcessedInfo[]>([])
@@ -95,6 +96,12 @@ onBeforeMount(async () => {
 
 let peekCache = new Map<string, BookmarkStoreInfo>()
 
+chrome.storage.local.get(['peek-cache'], (result) => {
+  if (result['peek-cache']) {
+    peekCache = new Map(Object.entries(result['peek-cache']))
+  }
+})
+
 const peekNodesCallback = (id: string, data: BookmarkStoreInfo | undefined) => {
   if (data) {
     let idx = bookmarks.value.findIndex((item) => {
@@ -103,8 +110,9 @@ const peekNodesCallback = (id: string, data: BookmarkStoreInfo | undefined) => {
     if (peeking.value) {
       bookmarks.value[idx].url = data.url
       bookmarks.value[idx].title = data.title
-      bookmarks.value[idx].peeked = true
+      bookmarks.value[idx].peekState = PeekState.Peeked
     }
+    storePeekCache()
   } else {
     // do nothing
   }
@@ -279,7 +287,7 @@ const unlockBookmark = async (info: BookmarkInfo) => {
 
   console.log('Unlock Bookmark')
 
-  if (info.peeked === true) {
+  if (info.peekState === PeekState.Peeked) {
     updateBookmark({
       id: info.id,
       title: info.title,
@@ -321,6 +329,8 @@ const unlockBookmark = async (info: BookmarkInfo) => {
     activeModal.value = Modals.Retry
   }
 }
+
+provide(peekInfoKey, { peeking: peeking })
 
 provide(manageBookmarkKey, {
   openFolder,
@@ -441,12 +451,20 @@ async function handlePeekClick() {
   refreshBookmarkTree()
 }
 
+async function storePeekCache() {
+  await chrome.storage.local.set({
+    'peek-cache': Object.fromEntries(peekCache),
+  })
+}
+
 async function updateUnlockPassword(
   newPassword: string,
   updateChrome: boolean
 ) {
   if (newPassword === '') {
     peeking.value = false
+    chrome.storage.local.remove('unlock-password')
+    chrome.storage.local.remove('peek-cache')
   }
 
   if (updateChrome) {
@@ -489,9 +507,9 @@ onMounted(() => {
 
   chrome.storage.local.get('expire-time', (data) => {
     let expireTime = data['expire-time']
-    console.log('expireTime', expireTime)
-    console.log('currentTime', Date.now())
-    console.log('seconds till expire', (expireTime - Date.now()) / 1000)
+    // console.log('expireTime', expireTime)
+    // console.log('currentTime', Date.now())
+    // console.log('seconds till expire', (expireTime - Date.now()) / 1000)
 
     if (!expireTime) {
       // first time open
@@ -504,6 +522,8 @@ onMounted(() => {
     } else {
       // key is expired
       chrome.storage.local.remove('unlock-password')
+      // also clear cache
+      chrome.storage.local.remove('peek-cache')
     }
   })
 })
