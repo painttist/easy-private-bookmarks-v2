@@ -1,6 +1,9 @@
 <template>
   <teleport to="body">
-    <transition name="fade">
+    <transition
+      name="fade"
+      @enter="elmPasswordInput?.focus()"
+    >
       <modal
         :message="message"
         v-if="opened"
@@ -10,16 +13,17 @@
             <input
               class="w-full text-base py-2 px-4 bg-gray-100 my-2"
               v-model="password"
+              ref="elmPasswordInput"
               :type="viewPasswords ? 'text' : 'password'"
               :placeholder="inputPlaceholders[0]"
             />
             <button
               v-if="password.length > 0"
-              class="absolute right-2 top-5 text-base cursor-pointer"
+              class="absolute right-2 top-[0.85rem] p-1.5 text-base cursor-pointer"
               @click="viewPasswords = !viewPasswords"
             >
-              <icon-mdi-eye-off v-if="viewPasswords" />
-              <icon-mdi-eye v-if="!viewPasswords" />
+              <icon-material-symbols-visibility-off v-if="viewPasswords" />
+              <icon-material-symbols-visibility v-if="!viewPasswords" />
             </button>
           </div>
           <input
@@ -36,14 +40,14 @@
               @click="onLaterBtn"
               class="rounded-md p-2 flex flex-col cursor-pointer items-center w-16 bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-800 transition-colors"
             >
-              <icon-mdi-clock class="text-lg" />Later
+              <icon-material-symbols-schedule-outline class="text-lg" />Later
             </button>
             <button
               @click="onConfirmBtn"
               class="rounded-md p-2 flex flex-col cursor-pointer items-center w-16 bg-emerald-100 hover:bg-emerald-200 text-emerald-600 hover:text-emerald-800 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-default transition-colors"
               :disabled="!canConfirm"
             >
-              <icon-mdi-check-bold class="text-lg" />Confirm
+              <icon-material-symbols-done class="text-lg" />Confirm
             </button>
           </div>
         </div>
@@ -63,6 +67,8 @@ const props = defineProps<{
 }>()
 
 // define ref for data
+
+const elmPasswordInput = ref<HTMLElement | null>(null)
 
 const viewPasswords = ref(false)
 
@@ -99,6 +105,7 @@ const onLaterBtn = (event: Event) => {
   emit('panel-close')
   // hidePanel()
 }
+
 // const showPanel = () => {
 //   opened.value = true
 // }

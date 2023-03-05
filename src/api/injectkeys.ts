@@ -9,6 +9,6 @@ export const manageBookmarkKey = Symbol() as InjectionKey<{
   deleteBookmark: (id: string) => void
 }>
 
-export const peekInfoKey = Symbol() as InjectionKey<{
-  peeking: Ref<boolean>
-}>
+// export const peekInfoKey = Symbol() as InjectionKey<{
+//   peeking: Ref<boolean>
+// }>

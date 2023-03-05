@@ -17,6 +17,7 @@
     }
   ],
   "host_permissions": ["*://*/*"],
+  "incognito":"split",
   "manifest_version": 3,
   "name": "Easy Private Bookmarks",
   "options_page": "src/options/index.html",

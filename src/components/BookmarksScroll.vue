@@ -1,6 +1,5 @@
 <template>
   <!-- <button @click="handleScrollTo(100)">Scroll to 100</button> -->
-  <!-- <icon-mdi-apple class="text-black inline-block" /> -->
   <div>
     <recycle-scroller
       class="scrollbar h-[400px] pr-1.5"

@@ -23,24 +23,24 @@
           v-if="isFolder"
           class="py-1.5"
         >
-          <icon-mdi-folder-open
+          <icon-material-symbols-folder-open
             v-if="node.open"
             class="block text-yellow-400 text-base"
-          ></icon-mdi-folder-open>
-          <icon-mdi-folder
+          ></icon-material-symbols-folder-open>
+          <icon-material-symbols-folder
             v-if="!node.open"
             class="block text-yellow-400 text-base"
-          ></icon-mdi-folder>
+          ></icon-material-symbols-folder>
         </div>
         <img
           v-if="!isFolder && !locked"
           :src="faviconUrl"
           class="w-4 h-4"
         />
-        <icon-mdi-lock
+        <icon-material-symbols-lock
           v-if="!isFolder && locked"
           class="text-base text-purple-500"
-        ></icon-mdi-lock>
+        ></icon-material-symbols-lock>
       </div>
       <!-- Text -->
       <div
@@ -68,14 +68,14 @@
             'hover:bg-purple-200 text-purple-500': locked,
           }"
         >
-          <icon-mdi-lock-open
+          <icon-material-symbols-lock-open
             v-if="!locked"
             class=""
-          ></icon-mdi-lock-open>
-          <icon-mdi-lock
+          ></icon-material-symbols-lock-open>
+          <icon-material-symbols-lock
             v-if="locked"
             class=""
-          ></icon-mdi-lock>
+          ></icon-material-symbols-lock>
         </div>
       </div>
     </div>
@@ -83,17 +83,12 @@
 </template>
 
 <script lang="ts" setup>
-import { manageBookmarkKey, peekInfoKey } from '../api/injectkeys'
+import { manageBookmarkKey } from '../api/injectkeys'
 import { BookmarkInfo, BookmarkProcessedInfo, isLockedURL, PeekState } from '../api/lib'
-
-import { generateFragment, decryptFragment } from '../api/link'
-const urlBase = chrome.runtime.getURL('options.html')
 
 const props = defineProps<{
   node: BookmarkProcessedInfo
 }>()
-
-// const peekInfo = inject(peekInfoKey)
 
 const isUnlocking = computed(() => {
   return props.node.peekState === PeekState.Unlocking
@@ -118,8 +113,6 @@ const faviconUrl = computed(() => {
 const {
   openFolder,
   closeFolder,
-  updateBookmark,
-  deleteBookmark,
   lockBookmark,
   unlockBookmark,
 } = inject(manageBookmarkKey, {

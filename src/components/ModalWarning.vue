@@ -17,28 +17,28 @@
               @click="onConfirmBtn"
               class="rounded-md p-2 flex flex-col cursor-pointer items-center w-16 bg-gray-100 hover:bg-green-200 text-gray-600 hover:text-emerald-800 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-default transition-colors"
             >
-              <icon-mdi-check-bold class="text-lg" />Yes
+              <icon-material-symbols-done class="text-lg" />Yes
             </button>
             <button
               v-if="!isDanger"
               @click="onLaterBtn"
               class="rounded-md p-2 flex flex-col cursor-pointer items-center w-16 bg-gray-100 hover:bg-red-200 text-gray-600 hover:text-red-800 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-default transition-colors"
             >
-              <icon-mdi-close-thick class="text-lg" />No
+              <icon-material-symbols-close class="text-lg" />No
             </button>
             <button
               v-if="isDanger"
               @click="onLaterBtn"
               class="rounded-md p-2 flex flex-col cursor-pointer items-center w-16 bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 transition-colors"
             >
-              <icon-mdi-close-thick class="text-lg" />No
+              <icon-material-symbols-close class="text-lg" />No
             </button>
             <button
               v-if="!isDanger"
               @click="onConfirmBtn"
               class="rounded-md p-2 flex flex-col cursor-pointer items-center w-16 bg-emerald-100 hover:bg-emerald-200 text-emerald-600 hover:text-emerald-800 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-default transition-colors"
             >
-              <icon-mdi-check-bold class="text-lg" />Yes
+              <icon-material-symbols-done class="text-lg" />Yes
             </button>
           </div>
         </div>

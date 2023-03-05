@@ -146,7 +146,7 @@ export async function decryptKey(privateKey: string, password: string) {
 export async function decryptData(
   encryptedData: string,
   password: string,
-  encryptedPrivateKey: string | undefined
+  encryptedPrivateKey?: string
 ): Promise<BookmarkStoreInfo> {
   let privateKey
 
@@ -311,7 +311,7 @@ export const DEFAULT_KEYTIMEOUT = 120000
 
 export const urlSupportIdentifier = '?for=easy-private-bookmark'
 
-export const baseURL = chrome.runtime.getURL('options.html')
+export const baseURL = chrome.runtime.getURL('/src/options/index.html')
 
 export function generateNewURLFromFrag(frag: string) {
   return baseURL + urlSupportIdentifier + '#' + frag
