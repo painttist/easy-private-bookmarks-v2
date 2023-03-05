@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // const bookmarks = ref<chrome.bookmarks.BookmarkTreeNode[]>([])
-
+import { sendMessage } from 'webext-bridge'
 import { manageBookmarkKey } from '../api/injectkeys'
 import { migrate, getKeyPair, removeKeyPair, storeKeyPair } from '../api/keys'
 import {
@@ -25,10 +25,14 @@ const searchQuery = ref('')
 const filtering = ref(false)
 const peeking = ref(false)
 
-chrome.bookmarks.getTree((tree) => {
-  rawInfo.value = tree?.[0]?.children?.[0]?.children
-  refreshBookmarkTree()
-})
+function reloadBookmarkTree() {
+  chrome.bookmarks.getTree((tree) => {
+    rawInfo.value = tree?.[0]?.children?.[0]?.children
+    refreshBookmarkTree()
+  })
+}
+
+reloadBookmarkTree()
 
 const publickKey = ref('')
 const privateKeyEncrypted = ref('')
@@ -55,18 +59,27 @@ enum Modals {
 
 const activeModal = ref(Modals.None)
 
+const migrating = ref(false)
+const migratingCount = ref(0)
+
 async function initialize() {
   // migrate from v1
-  await migrate()
+  let data = await chrome.storage.sync.get('lock-password')
+  let lockPassword = data['lock-password']
+  if (lockPassword) {
+    migrating.value = true
+    await migrate()
+    migrating.value = false
+  }
 
   let keyPair = await getKeyPair()
   if (keyPair) {
-    console.log('Key pair found')
-    console.log(keyPair)
+    // console.log('Key pair found')
+    // console.log(keyPair)
     publickKey.value = keyPair.jwkPublicKey
     privateKeyEncrypted.value = keyPair.encryptedPrivateKey
   } else {
-    console.log('Key pair not found')
+    // console.log('Key pair not found')
     // prompt user to create a new key pair
     activeModal.value = Modals.Lock
   }
@@ -207,6 +220,7 @@ const updateBookmark = async (newNode: BookmarkInfo) => {
     })
   } catch (error) {
     console.log(error)
+    reloadBookmarkTree()
     return
   }
 
@@ -286,6 +300,52 @@ const peekBookmark = async (info: BookmarkInfo) => {
 
 const unlockBookmarkResolve: any = ref(null)
 
+const addLink = async (id: string) => {
+  console.log('Add link!')
+
+  // find the link with id
+  let linkIndex = bookmarks.value.findIndex((item) => {
+    return item.id == id
+  })
+
+  let originalInfo = (
+    await chrome.bookmarks.getSubTree(bookmarks.value[linkIndex].id)
+  )[0]
+
+  if (!originalInfo) return
+
+  let isFolder = originalInfo.children ? true : false
+
+  let index, parentId, title, url
+
+  if (isFolder) {
+    index = 0
+    parentId = originalInfo.id
+  } else {
+    if (originalInfo.index === undefined) {
+      index = 0
+    } else {
+      index = originalInfo.index + 1
+    }
+    parentId = originalInfo.parentId
+  }
+
+  let [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+
+  // console.log('Add link!', index, parentId)
+
+  // let tab = await getCurrentTab()
+  // console.log(tab)
+  await chrome.bookmarks.create({
+    index: index,
+    parentId: parentId,
+    title: tab.title,
+    url: tab.url,
+  })
+
+  reloadBookmarkTree()
+}
+
 const unlockBookmark = async (info: BookmarkInfo) => {
   if (!info.url) return
 
@@ -341,6 +401,7 @@ provide(manageBookmarkKey, {
   deleteBookmark,
   lockBookmark,
   unlockBookmark,
+  addLink,
 })
 
 function onInputFocus() {
@@ -506,10 +567,8 @@ async function updateUnlockPassword(
 }
 
 // TODO Easier away to add links and locked links
-// - add an additional button in-between the links to insert new bookmark
 // = keyboard trigger
 // - automatically lock a folder?
-// - options page
 // - test the migration function
 
 onMounted(() => {
@@ -540,6 +599,19 @@ onMounted(() => {
 </script>
 
 <template>
+  <modal-warning
+    :opened="migrating"
+    :isDanger="true"
+    :title="'Migrating from v1'"
+    :message="`Please don't close the app.
+Data may be corrupted!
+
+This popup will disappear when the migration is done.
+You have clicked the buttons ${migratingCount} times.
+`"
+    @panel-confirm="migratingCount += 1"
+    @panel-close="migratingCount += 1"
+  ></modal-warning>
   <modal-password
     :opened="activeModal == Modals.Lock"
     :message="'One-time Lock Setup'"

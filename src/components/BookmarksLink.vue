@@ -1,21 +1,17 @@
 <template>
   <div
-    class="group align-left cursor-default h-full w-full flex"
+    class="group align-left cursor-default h-full w-full flex relative transition-colors"
     :style="{ 'padding-left': node.level * 1.2 + 'em' }"
     :class="{
       'hover:text-blue-500': !locked,
+      'border-b-[1px] border-blue-500': previewInsert,
     }"
   >
     <!-- Link -->
     <div
       class="w-full min-w-0 cursor-pointer flex items-center gap-1 hover:bg-white pl-2 rounded transition-colors duration-100"
       @click="handleLinkClick"
-      :class="{
-        locked: locked,
-        url: !isFolder,
-        folder: isFolder,
-        match: true,
-      }"
+      :class="{}"
     >
       <!-- Icon before text -->
       <div class="w-5 flex justify-end">
@@ -39,17 +35,23 @@
         />
         <icon-material-symbols-lock
           v-if="!isFolder && locked"
-          class="text-base text-purple-500"
+          class="text-base"
+          :class="{
+            'text-purple-500': !isCorrupted,
+            'text-red-500': isCorrupted,
+          }"
         ></icon-material-symbols-lock>
       </div>
       <!-- Text -->
       <div
         class="whitespace-nowrap overflow-hidden text-ellipsis w-full"
         :class="{
-          'text-purple-500': locked,
-        }"
+            'text-purple-500': locked && !isCorrupted,
+            'text-red-500': isCorrupted,
+          }"
       >
         {{
+          isCorrupted ? 'Corrupted' :
           isUnlocking
             ? 'Peeking inside ...'
             : node.title || node.url?.match(/\w*\.?\w*\.\w*/)?.[0]
@@ -57,11 +59,19 @@
       </div>
       <!-- Controls -->
       <div
-        v-if="!isFolder"
         class="group-hover:opacity-100 flex-shrink-0 opacity-0 transition-all overflow-hidden duration-100 h-full flex items-center gap-1 text-base"
       >
         <div
+          @click.stop="handleAddLink"
+          @mouseenter="previewInsert = true"
+          @mouseleave="previewInsert = false"
+          class="transition-colors duration-100 rounded py-1.5 px-1.5 hover:bg-blue-200 text-blue-500"
+        >
+          <icon-material-symbols-bookmark-add />
+        </div>
+        <div
           @click="handleLock"
+          v-if="!isFolder"
           class="transition-colors duration-100 rounded py-1.5 px-1.5"
           :class="{
             'hover:bg-blue-200 text-blue-500': !locked,
@@ -84,7 +94,12 @@
 
 <script lang="ts" setup>
 import { manageBookmarkKey } from '../api/injectkeys'
-import { BookmarkInfo, BookmarkProcessedInfo, isLockedURL, PeekState } from '../api/lib'
+import {
+  BookmarkInfo,
+  BookmarkProcessedInfo,
+  isLockedURL,
+  PeekState,
+} from '../api/lib'
 
 const props = defineProps<{
   node: BookmarkProcessedInfo
@@ -94,8 +109,15 @@ const isUnlocking = computed(() => {
   return props.node.peekState === PeekState.Unlocking
   // return peekInfo?.peeking.value && isLockedURL(props.node.url)
 })
+
+const isCorrupted = computed(() => {
+  return props.node.peekState === PeekState.Failed
+})
+
 const locked = computed(
-  () => (props.node.url && isLockedURL(props.node.url)) || props.node.peekState !== PeekState.None
+  () =>
+    (props.node.url && isLockedURL(props.node.url)) ||
+    props.node.peekState !== PeekState.None
 )
 const isFolder = computed(() => !props.node.url)
 
@@ -110,34 +132,42 @@ const faviconUrl = computed(() => {
   )
 })
 
-const {
-  openFolder,
-  closeFolder,
-  lockBookmark,
-  unlockBookmark,
-} = inject(manageBookmarkKey, {
-  openFolder: (id: string) => {},
-  closeFolder: (id: string) => {},
-  updateBookmark: async (newNode: BookmarkInfo) => {},
-  deleteBookmark: function (id: string): void {
-    throw new Error('Function not implemented.')
-  },
-  lockBookmark(info) {},
-  unlockBookmark(info) {},
-})
+const { openFolder, closeFolder, lockBookmark, unlockBookmark, addLink } =
+  inject(manageBookmarkKey, {
+    openFolder: (id: string) => {},
+    closeFolder: (id: string) => {},
+    updateBookmark: async (newNode: BookmarkInfo) => {},
+    deleteBookmark: function (id: string): void {
+      throw new Error('Function not implemented.')
+    },
+    lockBookmark(info) {},
+    unlockBookmark(info) {},
+    addLink(info) {},
+  })
+
+const previewInsert = ref(false)
+
+async function handleAddLink() {
+
+  addLink(props.node.id)
+
+  // const newNode = await chrome.bookmarks.create({
+  //   index: parseInt(props.node.id),
+  //   title: 'New Link',
+  //   url: 'https://www.google.com',
+  // })
+  // console.log(newNode)
+}
 
 async function handleLock(e: Event) {
   e.stopPropagation()
-  // chrome.bookmarks.update(node.id, {
-  //   title: "Locked"
-  // }, (node) => { console.log(node) })
 
-  if (!props.node.url) {
-    // Is Folder
-  } else if (!locked.value) {
+  if (!props.node.url) return
+
+  if (!locked.value) {
     // To Lock
     lockBookmark(props.node)
-  } else if (locked.value) {
+  } else {
     // To UnLock
     unlockBookmark(props.node)
   }

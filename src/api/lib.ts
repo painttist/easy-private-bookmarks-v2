@@ -68,7 +68,7 @@ export async function getEncryptedLink(
   if (!fragment) {
     return ''
   }
-  return baseURL + urlSupportIdentifier + '#' + fragment
+  return baseURL + '#' + fragment
 }
 
 async function encryptData(
@@ -260,8 +260,8 @@ export async function processNodes(
         decryptData(encryptedData, lockPassword, privateKey)
           .then(async (decryptedData) => {
             delayNum += 1
-            // TODO remove this delay
-            await new Promise((resolve) => setTimeout(resolve, delayNum * 100))
+            // Slight delay for a cooler effect
+            await new Promise((resolve) => setTimeout(resolve, delayNum * 50))
             peekCache.set(encryptedData, decryptedData)
             peekCallBack(object.id, decryptedData)
           })
@@ -309,20 +309,20 @@ export async function processNodes(
 
 export const DEFAULT_KEYTIMEOUT = 120000
 
-export const urlSupportIdentifier = '?for=easy-private-bookmark'
+// export const urlSupportIdentifier = '?for=easy-private-bookmark'
 
 export const baseURL = chrome.runtime.getURL('/src/options/index.html')
 
 export function generateNewURLFromFrag(frag: string) {
-  return baseURL + urlSupportIdentifier + '#' + frag
+  return baseURL + '#' + frag
 }
 
 export function isLockedURL(url?: string) {
   if (!url) return false
   return (
-    url.includes(urlSupportIdentifier) ||
-    (url.includes(baseURL) && url.includes('#')) ||
-    (url.includes('chrome-extension://') && url.includes('options.html#'))
+    // url.includes(urlSupportIdentifier) ||
+    // (url.includes('chrome-extension://') && url.includes('options.html#'))  ||
+    (url.includes(baseURL) && url.includes('#'))
   )
 }
 

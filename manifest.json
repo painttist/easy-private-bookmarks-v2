@@ -1,32 +1,22 @@
 {
   "action": {
     "default_popup": "src/popup/index.html",
-    "default_title": "Easy Private Bookmarks v2",
+    "default_title": "Easy Private Bookmarks",
     "default_icon": "logo.png"
   },
   "background": {
     "service_worker": "src/background/index.ts",
     "type": "module"
   },
-  "content_scripts": [
-    {
-      "all_frames": true,
-      "js": ["src/content-script/index.ts"],
-      "matches": ["*://*/*"],
-      "run_at": "document_end"
-    }
-  ],
-  "host_permissions": ["*://*/*"],
-  "incognito":"split",
+  "description": "Easiest way to create and manage password secured bookmarks. Open-source so you can trust.",
+  "incognito": "split",
   "manifest_version": 3,
   "name": "Easy Private Bookmarks",
   "options_page": "src/options/index.html",
-  "permissions": ["storage", "bookmarks"],
-  "version": "2.0.0",
-  "web_accessible_resources": [
-    {
-      "matches": ["*://*/*"],
-      "resources": ["src/content-script/index.ts"]
-    }
-  ]
+  "permissions": [
+    "storage",
+    "bookmarks",
+    "activeTab"
+  ],
+  "version": "2.0.0"
 }
