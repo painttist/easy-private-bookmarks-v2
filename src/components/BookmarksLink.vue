@@ -14,7 +14,7 @@
       :class="{}"
     >
       <!-- Icon before text -->
-      <div class="w-5 flex justify-end">
+      <div class="w-4 flex justify-center shrink-0">
         <div
           v-if="isFolder"
           class="py-1.5"
@@ -46,13 +46,14 @@
       <div
         class="whitespace-nowrap overflow-hidden text-ellipsis w-full"
         :class="{
-            'text-purple-500': locked && !isCorrupted,
-            'text-red-500': isCorrupted,
-          }"
+          'text-purple-500': locked && !isCorrupted,
+          'text-red-500': isCorrupted,
+        }"
       >
         {{
-          isCorrupted ? 'Corrupted' :
-          isUnlocking
+          isCorrupted
+            ? 'Corrupted'
+            : isUnlocking
             ? 'Peeking inside ...'
             : node.title || node.url?.match(/\w*\.?\w*\.\w*/)?.[0]
         }}
@@ -60,7 +61,21 @@
       <!-- Controls -->
       <div
         class="group-hover:opacity-100 flex-shrink-0 opacity-0 transition-all overflow-hidden duration-100 h-full flex items-center gap-1 text-base"
-      >
+      ><div
+          @click.stop="handleAddFolder"
+          @mouseenter="previewInsert = true"
+          @mouseleave="previewInsert = false"
+          class="transition-colors duration-100 rounded py-1.5 px-1.5 hover:bg-blue-200 text-blue-500"
+        >
+          <icon-material-symbols-create-new-folder />
+        </div>
+        <div
+          @click.stop="handleEditLink"
+          class="transition-colors duration-100 rounded py-1.5 px-1.5 hover:bg-blue-200 text-blue-500"
+        >
+          <icon-material-symbols-edit />
+        </div>
+        
         <div
           @click.stop="handleAddLink"
           @mouseenter="previewInsert = true"
@@ -88,6 +103,8 @@
           ></icon-material-symbols-lock>
         </div>
       </div>
+      
+      
     </div>
   </div>
 </template>
@@ -132,7 +149,7 @@ const faviconUrl = computed(() => {
   )
 })
 
-const { openFolder, closeFolder, lockBookmark, unlockBookmark, addLink } =
+const { openFolder, closeFolder, lockBookmark, unlockBookmark, addLink, editLink, addFolder } =
   inject(manageBookmarkKey, {
     openFolder: (id: string) => {},
     closeFolder: (id: string) => {},
@@ -143,20 +160,22 @@ const { openFolder, closeFolder, lockBookmark, unlockBookmark, addLink } =
     lockBookmark(info) {},
     unlockBookmark(info) {},
     addLink(info) {},
+    addFolder(info) {},
+    editLink(info) {},
   })
 
 const previewInsert = ref(false)
 
+async function handleEditLink() {
+  editLink(props.node.id)
+}
+
+async function handleAddFolder() {
+  addFolder(props.node.id)
+}
+
 async function handleAddLink() {
-
   addLink(props.node.id)
-
-  // const newNode = await chrome.bookmarks.create({
-  //   index: parseInt(props.node.id),
-  //   title: 'New Link',
-  //   url: 'https://www.google.com',
-  // })
-  // console.log(newNode)
 }
 
 async function handleLock(e: Event) {

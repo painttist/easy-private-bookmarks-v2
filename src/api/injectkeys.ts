@@ -8,6 +8,8 @@ export const manageBookmarkKey = Symbol() as InjectionKey<{
   unlockBookmark: (info: BookmarkInfo) => Promise<void>
   deleteBookmark: (id: string) => void
   addLink: (id: string) => void
+  addFolder: (id: string) => void
+  editLink: (id: string) => void
 }>
 
 // export const peekInfoKey = Symbol() as InjectionKey<{

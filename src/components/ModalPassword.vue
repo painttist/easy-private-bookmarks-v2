@@ -11,7 +11,7 @@
         <div class="px-8 pb-4 w-full">
           <div class="relative">
             <input
-              class="w-full text-base py-2 px-4 bg-gray-100 my-2"
+              class="w-full text-base py-2 px-4 bg-gray-100 my-2 rounded"
               v-model="password"
               ref="elmPasswordInput"
               :type="viewPasswords ? 'text' : 'password'"
@@ -31,7 +31,7 @@
             v-model="confirmPassword"
             type="password"
             :placeholder="inputPlaceholders[1]"
-            class="w-full transition-vertical text-base py-2 px-4 bg-gray-100 my-2"
+            class="w-full transition-vertical text-base py-2 px-4 bg-gray-100 my-2 rounded"
             :class="{ shrunk: !password }"
           />
           <!-- Buttons -->

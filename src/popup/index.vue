@@ -55,6 +55,7 @@ enum Modals {
   WarnRemoveLock,
   WarnDeleteKey,
   Welcome,
+  // EditBookmark
 }
 
 const activeModal = ref(Modals.None)
@@ -347,6 +348,50 @@ const addLink = async (id: string) => {
   reloadBookmarkTree()
 }
 
+const addFolder = async (id: string) => {
+  
+  // find the link with id
+  let linkIndex = bookmarks.value.findIndex((item) => {
+    return item.id == id
+  })
+
+  let originalInfo = (
+    await chrome.bookmarks.getSubTree(bookmarks.value[linkIndex].id)
+  )[0]
+
+  if (!originalInfo) return
+
+  let isFolder = originalInfo.children ? true : false
+
+  let index, parentId
+
+  if (isFolder) {
+    index = 0
+    parentId = originalInfo.id
+  } else {
+    if (originalInfo.index === undefined) {
+      index = 0
+    } else {
+      index = originalInfo.index + 1
+    }
+    parentId = originalInfo.parentId
+  }
+  await chrome.bookmarks.create({
+    index: index,
+    parentId: parentId,
+    title: 'New Folder',
+  })
+
+  reloadBookmarkTree()
+}
+
+const editingLinkId = ref('')
+
+const editLink = async (id: string) => {
+  editingLinkId.value = id
+  // activeModal.value = Modals.EditBookmark
+}
+
 const unlockBookmark = async (info: BookmarkInfo) => {
   if (!info.url) return
 
@@ -403,6 +448,8 @@ provide(manageBookmarkKey, {
   lockBookmark,
   unlockBookmark,
   addLink,
+  addFolder,
+  editLink,
 })
 
 function onInputFocus() {
@@ -639,6 +686,17 @@ onMounted(() => {
 </script>
 
 <template>
+  <modal-manage
+    :opened="editingLinkId !== ''"
+    :id="editingLinkId"
+    @panel-close="
+      () => {
+        editingLinkId = ''
+        reloadBookmarkTree()
+      }
+    "
+  >
+  </modal-manage>
   <modal-warning
     :opened="migrating"
     :isDanger="true"
