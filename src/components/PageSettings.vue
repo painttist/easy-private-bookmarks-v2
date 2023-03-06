@@ -73,10 +73,10 @@ const isChanged = computed(() => {
 onMounted(async () => {
   const data = await chrome.storage.sync.get('option-key-timeout')
   keyTimeout.value = data['option-key-timeout']
-  console.log('Key Timeout', keyTimeout.value)
+  // console.log('Key Timeout', keyTimeout.value)
   if (!keyTimeout.value) {
     await chrome.storage.sync.set({ 'option-key-timeout': DEFAULT_KEYTIMEOUT })
-    console.log('Set default time out')
+    // console.log('Set default time out')
     keyTimeout.value = DEFAULT_KEYTIMEOUT
   }
   minutes.value = keyTimeout.value / 60000 // ms
@@ -86,7 +86,7 @@ function handleKeyExpireChange() {
   if (!minutes.value) {
     minutes.value = 0
   }
-  console.log('minutes', minutes.value)
+  // console.log('minutes', minutes.value)
   // storeKeyTimeout(minutes.value * 60000)
 }
 

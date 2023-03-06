@@ -303,7 +303,7 @@ const peekBookmark = async (info: BookmarkInfo) => {
 const unlockBookmarkResolve: any = ref(null)
 
 const addLink = async (id: string) => {
-  console.log('Add link!')
+  // console.log('Add link!')
 
   // find the link with id
   let linkIndex = bookmarks.value.findIndex((item) => {
@@ -395,7 +395,7 @@ const editLink = async (id: string) => {
 const unlockBookmark = async (info: BookmarkInfo) => {
   if (!info.url) return
 
-  console.log('Unlock Bookmark')
+  // console.log('Unlock Bookmark')
 
   if (info.peekState === PeekState.Peeked) {
     updateBookmark({
@@ -633,27 +633,22 @@ async function updateUnlockPassword(
 
     startTempCountDown()
 
-    console.log('Set expried time done', expireTime, Date.now())
+    // console.log('Set expried time done', expireTime, Date.now())
   }
 
-  console.log('Updated Unlock Password')
+  // console.log('Updated Unlock Password')
   unlockPassword.value = newPassword
 
   if (unlockBookmarkResolve.value !== null) {
-    console.log('Trying to resolve')
+    // console.log('Trying to resolve')
     unlockBookmarkResolve.value(true)
     unlockBookmarkResolve.value = null
   } else {
-    console.log('Resolve Value:', unlockBookmarkResolve.value)
+    // console.log('Resolve Value:', unlockBookmarkResolve.value)
   }
 
   refreshBookmarkTree()
 }
-
-// TODO Easier away to add links and locked links
-// = keyboard trigger
-// - automatically lock a folder?
-// - test the migration function
 
 onMounted(() => {
   elmInput.value?.focus()
@@ -666,7 +661,7 @@ onMounted(() => {
     if (!expireTime) {
       // first time open
     } else if (expireTime > Date.now()) {
-      console.log('Key is still ok')
+      // console.log('Key is still ok')
       // The key is still ok
       chrome.storage.local.get('unlock-password', (data) => {
         let lockPassword = data['unlock-password']
