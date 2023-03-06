@@ -22,6 +22,6 @@
 <script lang="ts" setup>
 defineProps<{
   message: string
-  wide: boolean | undefined
+  wide?: boolean
 }>()
 </script>

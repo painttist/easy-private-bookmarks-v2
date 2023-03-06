@@ -298,6 +298,7 @@ const peekBookmark = async (info: BookmarkInfo) => {
   })
 }
 
+// To allow waiting for modal resolve and then continue with decryption/locking
 const unlockBookmarkResolve: any = ref(null)
 
 const addLink = async (id: string) => {
@@ -521,21 +522,50 @@ async function storePeekCache() {
   })
 }
 
+const tempPasswordTimer = ref(0)
+const tempPasswordExpireTime = ref(0)
+
+const passwordExpireTimerDeg = computed(() => {
+  return (tempPasswordTimer.value / tempPasswordExpireTime.value) * 360
+})
+
+const fps = 24
+
+const startTempCountDown = () => {
+  if (tempPasswordTimer.value >= tempPasswordExpireTime.value) {
+    if (activeModal.value === Modals.WarnDeleteKey) {
+      clearModal()
+    }
+    updateUnlockPassword('', true)
+    return
+  }
+  setTimeout(() => {
+    tempPasswordTimer.value += 1000 / fps
+    startTempCountDown()
+  }, fps)
+}
+
 async function updateUnlockPassword(
   newPassword: string,
   updateChrome: boolean
 ) {
   if (newPassword === '') {
     peeking.value = false
-    chrome.storage.local.remove('unlock-password')
-    chrome.storage.local.remove('peek-cache')
+    filtering.value = false
+    unlockPassword.value = ''
+    peekCache.clear()
+    if (updateChrome) {
+      chrome.storage.local.remove('unlock-password')
+      chrome.storage.local.remove('peek-cache')
+    }
+    refreshBookmarkTree()
+    return
   }
 
   if (updateChrome) {
     await chrome.storage.local.set({ 'unlock-password': newPassword })
 
     let data = await chrome.storage.sync.get('option-key-timeout')
-
     let keyTimeout = data['option-key-timeout']
 
     let expireTime = 0
@@ -544,12 +574,19 @@ async function updateUnlockPassword(
         'option-key-timeout': DEFAULT_KEYTIMEOUT,
       })
       expireTime = Date.now() + DEFAULT_KEYTIMEOUT // ms
+      tempPasswordExpireTime.value = DEFAULT_KEYTIMEOUT
+      tempPasswordTimer.value = 0
     } else {
       expireTime = Date.now() + keyTimeout // ms
+      tempPasswordExpireTime.value = keyTimeout
+      tempPasswordTimer.value = 0
     }
 
     await chrome.storage.local.set({ 'expire-time': expireTime })
-    console.log('Set expried time done')
+
+    startTempCountDown()
+
+    console.log('Set expried time done', expireTime, Date.now())
   }
 
   console.log('Updated Unlock Password')
@@ -576,18 +613,21 @@ onMounted(() => {
 
   chrome.storage.local.get('expire-time', (data) => {
     let expireTime = data['expire-time']
-    // console.log('expireTime', expireTime)
-    // console.log('currentTime', Date.now())
-    // console.log('seconds till expire', (expireTime - Date.now()) / 1000)
+
+    // console.log('Got expried time', expireTime - Date.now())
 
     if (!expireTime) {
       // first time open
     } else if (expireTime > Date.now()) {
+      console.log('Key is still ok')
       // The key is still ok
       chrome.storage.local.get('unlock-password', (data) => {
         let lockPassword = data['unlock-password']
         if (lockPassword) updateUnlockPassword(lockPassword, false)
       })
+      tempPasswordExpireTime.value = expireTime - Date.now()
+      tempPasswordTimer.value = 0
+      startTempCountDown()
     } else {
       // key is expired
       chrome.storage.local.remove('unlock-password')
@@ -675,9 +715,9 @@ Do you remember your password?`"
     :opened="activeModal == Modals.WarnDeleteKey"
     :isDanger="false"
     :title="'Delete Tempary Key?'"
-    :message="`Key will automatically be deleted after ${
-      DEFAULT_KEYTIMEOUT / 1000
-    } seconds. Confirm to delete now?`"
+    :message="`Key will automatically be deleted after ${Math.floor(
+      (tempPasswordExpireTime - tempPasswordTimer) / 1000
+    )} seconds. Confirm to delete now?`"
     @panel-confirm="updateUnlockPassword('', true).then(clearModal)"
     @panel-close="clearModal"
   >
@@ -704,9 +744,13 @@ Do you remember your password?`"
       </button>
       <button
         :title="
-          isPasswordEmpty ? 'Add Tempary Password' : 'Remove Tempary Password'
+          isPasswordEmpty
+            ? 'Add Temp. Password'
+            : `Remove Temp. Password (${Math.floor(
+                (tempPasswordExpireTime - tempPasswordTimer) / 1000
+              )} sec. left)`
         "
-        class="p-2 text-base rounded transition-colors duration-200 disabled:hover:bg-transparent disabled:text-gray-500"
+        class="p-1 text-base rounded transition-colors duration-200 disabled:hover:bg-transparent disabled:text-gray-500"
         :class="{
           'hover:bg-white': isPasswordEmpty,
           'bg-purple-200 text-purple-600 hover:text-purple-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500':
@@ -715,8 +759,21 @@ Do you remember your password?`"
         @click="handleBtnKeyClick"
         :disabled="isLockEmpty"
       >
-        <icon-material-symbols-key-off v-if="isPasswordEmpty" />
-        <icon-material-symbols-key v-if="!isPasswordEmpty" />
+        <div
+          class="rounded-full p-1"
+          :style="{
+            backgroundImage: !isLockEmpty
+              ? !isPasswordEmpty
+                ? `conic-gradient(rgb(233 213 255) 0deg, rgb(243 244 246) 3deg, rgb(243 244 246) ${
+                    passwordExpireTimerDeg - 3
+                  }deg, rgb(233 213 255) ${passwordExpireTimerDeg}deg)`
+                : ``
+              : ``,
+          }"
+        >
+          <icon-material-symbols-key-off v-if="isPasswordEmpty" />
+          <icon-material-symbols-key v-if="!isPasswordEmpty" />
+        </div>
       </button>
       <div class="relative w-full">
         <input
