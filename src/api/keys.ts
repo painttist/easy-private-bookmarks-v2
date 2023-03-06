@@ -97,7 +97,7 @@ export async function migrate() {
             }
 
             if (newLink) {
-              console.log('New Link', newLink)
+              // console.log('New Link', newLink)
               countUpdated += 1
               await chrome.bookmarks.update(node.id, {
                 url: newLink,

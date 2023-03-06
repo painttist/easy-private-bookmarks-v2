@@ -4,7 +4,10 @@
     v-model="value"
     :style="computedStyles"
     @focus="resize"
-    @input="resize"
+    @input="() => {
+      resize()
+      emit('update:modelValue', value)
+    }"
   />
 </template>
 

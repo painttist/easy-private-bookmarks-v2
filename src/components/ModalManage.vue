@@ -23,7 +23,7 @@
             rows="1"
             class="w-full text-sm py-2 px-4 bg-gray-100 my-2 rounded"
             v-if="!isFolder"
-            :modelValue="url"
+            :modelValue="decodeURI(url)"
             @update:modelValue="updateUrl"
             ref="elmUrlInput"
             type="text"
@@ -83,6 +83,7 @@ const isFolder = ref(true)
 const init = () => {
   chrome.bookmarks.getSubTree(props.id, (bookmark) => {
     isFolder.value = !!bookmark?.[0].children
+    console.log('isFolder', isFolder.value, bookmark?.[0].title)
     title.value = bookmark?.[0].title
     if (!isFolder.value && bookmark?.[0].url) {
       url.value = bookmark?.[0].url
@@ -96,7 +97,7 @@ const emit = defineEmits(['panel-close'])
 const error = ref('')
 
 const updateUrl = (value: string) => {
-  console.log(updateUrl)
+  console.log('updateUrl', value)
   url.value = value
 }
 
@@ -108,15 +109,17 @@ const closePanel = () => {
 // define methods
 const onConfirmBtn = async (event: Event) => {
   // console.log('confirm')
+  console.log("Saving", title.value, url.value)
   if (!isFolder.value && url.value == '') {
     error.value = 'URL is required'
     return
   }
   try {
-    if (isFolder) {
+    if (isFolder.value) {
       await chrome.bookmarks.update(props.id, {
         title: title.value,
       })
+      console.log("Updated Folder Success", title.value, url.value)
       closePanel()
       return
     } else {
@@ -124,9 +127,11 @@ const onConfirmBtn = async (event: Event) => {
         title: title.value,
         url: url.value,
       })
+      console.log("Updated Success", title.value, url.value)
       closePanel()
     }
   } catch (e: any) {
+    console.log("Updated Error", e)
     if (e.toString().includes('Invalid URL')) {
       error.value = 'Invalid URL'
       return

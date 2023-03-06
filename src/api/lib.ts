@@ -113,24 +113,6 @@ async function encryptData(
     return ''
   }
 
-  // console.log('Imported JWK public key', publicKey)
-
-  // let encryptedBuffer
-  // try {
-  //   // console.log("Is secure context", window.isSecureContext)
-  //   encryptedBuffer = await window.crypto.subtle.encrypt(
-  //     {
-  //       name: 'RSA-OAEP',
-  //     },
-  //     publicKey,
-  //     dataArray
-  //   )
-  //   console.log('Encryption Successful')
-  //   let encryptedString = new TextDecoder().decode(encryptedBuffer)
-  // // console.log(encryptedString)
-  // } catch (error) {
-  //   console.log("Encryption failed", error)
-  // }
   return await crypt.rsaEncrypt(publicKey, dataArray)
 }
 
@@ -240,7 +222,6 @@ export async function processNodes(
         return result
       }
 
-      console.log('Peeking', object.url)
       // decrypt the url
 
       if (peekCache.has(encryptedData)) {
