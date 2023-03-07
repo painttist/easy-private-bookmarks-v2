@@ -109,7 +109,7 @@ async function encryptData(
       ['encrypt']
     )
   } catch (error) {
-    console.log("Can't import JWK public key")
+    console.log("Can't import JWK public key", jwk, error)
     return ''
   }
 
@@ -293,6 +293,7 @@ export const DEFAULT_KEYTIMEOUT = 120000
 // export const urlSupportIdentifier = '?for=easy-private-bookmark'
 
 export const baseURL = chrome.runtime.getURL('/src/options/index.html')
+export const baseURLv1 = chrome.runtime.getURL('/options.html')
 
 export function generateNewURLFromFrag(frag: string) {
   return baseURL + '#' + frag
@@ -303,8 +304,12 @@ export function isLockedURL(url?: string) {
   return (
     // url.includes(urlSupportIdentifier) ||
     // (url.includes('chrome-extension://') && url.includes('options.html#'))  ||
-    (url.includes(baseURL) && url.includes('#'))
+    url.includes(baseURL) && url.includes('#')
   )
+}
+
+export function isLockedURLv1(url: string) {
+  return url.includes(baseURLv1) && url.includes('#')
 }
 
 export async function generateHashForPassword(password: string) {

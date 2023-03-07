@@ -34,6 +34,9 @@
             class="w-full transition-vertical text-base py-2 px-4 bg-gray-100 my-2 rounded"
             :class="{ shrunk: !password }"
           />
+          <div v-if="content">
+            {{ content }}
+          </div>
           <!-- Buttons -->
           <div class="flex w-full mb-2 mt-2 justify-end text-center gap-2">
             <button
@@ -64,6 +67,7 @@ const props = defineProps<{
   inputPlaceholders: string[]
   requiresConfirm: boolean
   opened: boolean
+  content?: string
 }>()
 
 // define ref for data

@@ -11,7 +11,6 @@ declare module '@vue/runtime-core' {
   export interface GlobalComponents {
     BookmarksLink: typeof import('./components/BookmarksLink.vue')['default']
     BookmarksScroll: typeof import('./components/BookmarksScroll.vue')['default']
-    copy: typeof import('./components/TextareaAutoresize copy.vue')['default']
     Favicon: typeof import('./components/Favicon.vue')['default']
     IconMaterialSymbolsBookmarkAdd: typeof import('~icons/material-symbols/bookmark-add')['default']
     IconMaterialSymbolsClose: typeof import('~icons/material-symbols/close')['default']
@@ -39,6 +38,5 @@ declare module '@vue/runtime-core' {
     PageSettings: typeof import('./components/PageSettings.vue')['default']
     TextareaAutoresize: typeof import('./components/TextareaAutoresize.vue')['default']
     TextareaSyntaxHighlight: typeof import('./components/TextareaSyntaxHighlight.vue')['default']
-    TextareaSytaxHighlight: typeof import('./components/TextareaSytaxHighlight.vue')['default']
   }
 }

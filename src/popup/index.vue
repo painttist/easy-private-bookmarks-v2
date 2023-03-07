@@ -460,7 +460,7 @@ function onInputFocus() {
 }
 
 function updateSearch(e: KeyboardEvent) {
-  searchQuery.value = (e.target as HTMLInputElement).value
+  // searchQuery.value = (e.target as HTMLInputElement).value
   // console.log(searchQuery.value)
   if (rawInfo.value === undefined) {
     return
@@ -831,7 +831,7 @@ Do you remember your password?`"
       <div class="relative w-full">
         <input
           ref="elmInput"
-          :value="searchQuery"
+          v-model="searchQuery"
           @focus="onInputFocus"
           @keyup="updateSearch"
           @keydown.esc="clearSearch"
